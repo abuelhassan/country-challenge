@@ -234,6 +234,17 @@
             fill: #4abf93;
         }
 
+        .country-path.missed {
+            fill: #9e3a3a;
+            stroke: #e77;
+            stroke-width: .6px;
+        }
+
+        .country-label.missed {
+            fill: #ffffff;
+            stroke: #7a0000;
+        }
+
         /* ── Sidebar ── */
         #sidebar {
             display: none;
@@ -301,7 +312,48 @@
             background: #1e2535;
         }
 
-        /* ── Overlay (start / end) ── */
+        /* ── Results bar (end of game) ── */
+        #results-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        #results-bar.hidden {
+            display: none;
+        }
+
+        #results-text {
+            font-size: .95rem;
+            color: #e8eaf0;
+        }
+
+        #results-text strong {
+            color: #6ee7b7;
+        }
+
+        #play-again-btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #7eb8f7;
+            color: #0f1117;
+            font-weight: 700;
+            font-size: .9rem;
+            cursor: pointer;
+            transition: background .2s, transform .1s;
+            white-space: nowrap;
+        }
+
+        #play-again-btn:hover {
+            background: #a8d4ff;
+        }
+
+        #play-again-btn:active {
+            transform: scale(.96);
+        }
+
+        /* ── Overlay (start only) ── */
         #overlay {
             position: fixed;
             inset: 0;
@@ -428,6 +480,10 @@
         <input id="country-input" type="text" placeholder="Type a country…" autocomplete="off" disabled/>
     </div>
     <div id="feedback"></div>
+    <div id="results-bar" class="hidden">
+        <span id="results-text"></span>
+        <button id="play-again-btn">Play Again</button>
+    </div>
     <div id="score-box">
         <span id="score-label">Score</span>
         <span id="score">0</span>
@@ -476,6 +532,9 @@
     const overlayScore = document.querySelector('#overlay-box #overlay-score');
     const overlayScoreLabel = document.querySelector('#overlay-box #overlay-score-label');
     const overlayBtn = document.getElementById('overlay-btn');
+    const resultsBar = document.getElementById('results-bar');
+    const resultsText = document.getElementById('results-text');
+    const playAgainBtn = document.getElementById('play-again-btn');
     const tooltip = document.getElementById('tooltip');
 
     // ─── Map setup (D3 + TopoJSON) ───────────────────────────────────────────────
@@ -621,8 +680,11 @@
         scoreEl.textContent = '0';
         updateTimer();
         overlay.classList.add('hidden');
+        resultsBar.classList.add('hidden');
+        inputEl.style.display = '';
+        feedbackEl.style.display = '';
         // Reset all highlighted countries
-        pathMap.forEach(el => el.classList.remove('guessed'));
+        pathMap.forEach(el => el.classList.remove('guessed', 'missed'));
         inputEl.disabled = false;
         inputEl.focus();
     }
@@ -631,12 +693,30 @@
         clearInterval(timerInterval);
         gameActive = false;
         inputEl.disabled = true;
-        overlay.classList.remove('hidden');
 
-        overlayTitle.textContent = 'Time\'s Up!';
-        overlaySubtitle.textContent = `You named ${guessed.size} out of ${COUNTRIES.length} countries.`;
-        overlayScore.textContent = guessed.size;
-        overlayScoreLabel.textContent = `/ ${COUNTRIES.length} countries`;
+        // Mark missed countries in red
+        COUNTRIES.forEach(country => {
+            if (guessed.has(country.id)) return;
+            const el = pathMap.get(country.id);
+            if (el) el.classList.add('missed');
+            const feature = featuresMap.get(country.id);
+            if (feature) {
+                const c = path.centroid(feature);
+                if (!isNaN(c[0])) {
+                    g.append('text')
+                        .attr('class', 'country-label missed')
+                        .attr('data-id', country.id)
+                        .attr('x', c[0])
+                        .attr('y', c[1])
+                        .text(country.name);
+                }
+            }
+        });
+
+        inputEl.style.display = 'none';
+        feedbackEl.style.display = 'none';
+        resultsText.innerHTML = `Time's up! You named <strong>${guessed.size}</strong> / ${COUNTRIES.length} countries.`;
+        resultsBar.classList.remove('hidden');
     }
 
     function setFeedback(msg, cls) {
@@ -703,9 +783,11 @@
         }
     });
 
+    playAgainBtn.addEventListener('click', () => resetGame());
+
     overlayBtn.addEventListener('click', () => {
         overlayBtn.disabled = true;
-        startGame();
+        resetGame();
     });
 
     startBtn.addEventListener('click', () => {
