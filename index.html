@@ -429,6 +429,12 @@
         }
 
         /* Country labels on map */
+        .hint-dot {
+            fill: #f4c150;
+            opacity: .85;
+            pointer-events: none;
+        }
+
         .country-label {
             font-size: 7px;
             fill: #e8f4e8;
@@ -541,6 +547,7 @@
     const container = document.getElementById('map-container');
     const svg = d3.select(container).append('svg');
     const g = svg.append('g');
+    const dotsG = svg.append('g'); // rendered on top of everything in g
 
     const projection = d3.geoNaturalEarth1().rotate([-30, 0]);
     const path = d3.geoPath().projection(projection);
@@ -548,7 +555,10 @@
     // Zoom behaviour
     const zoom = d3.zoom()
         .scaleExtent([1, 12])
-        .on('zoom', e => g.attr('transform', e.transform));
+        .on('zoom', e => {
+            g.attr('transform', e.transform);
+            dotsG.attr('transform', e.transform);
+        });
     svg.call(zoom);
 
     function fitMap() {
@@ -630,11 +640,23 @@
                     tooltip.style.display = 'none';
                 });
 
-            // Build path map and features map
+            // Build path map, features map, and hint dots
             features.forEach(f => {
                 const el = document.getElementById(`c-${f.id}`);
                 if (el) pathMap.set(f.id, el);
                 featuresMap.set(f.id, f);
+
+                if (idLookup.has(f.id)) {
+                    const c = path.centroid(f);
+                    if (!isNaN(c[0])) {
+                        dotsG.append('circle')
+                            .attr('class', 'hint-dot')
+                            .attr('id', `dot-${f.id}`)
+                            .attr('cx', c[0])
+                            .attr('cy', c[1])
+                            .attr('r', 2);
+                    }
+                }
             });
 
             // Enable input once map is ready
@@ -677,6 +699,19 @@
         gameActive = true;
         timerStarted = false;
         g.selectAll('.country-label').remove();
+        dotsG.selectAll('.hint-dot').remove();
+        featuresMap.forEach((f, id) => {
+            if (!idLookup.has(id)) return;
+            const c = path.centroid(f);
+            if (!isNaN(c[0])) {
+                dotsG.append('circle')
+                    .attr('class', 'hint-dot')
+                    .attr('id', `dot-${id}`)
+                    .attr('cx', c[0])
+                    .attr('cy', c[1])
+                    .attr('r', 2);
+            }
+        });
         scoreEl.textContent = '0';
         updateTimer();
         overlay.classList.add('hidden');
@@ -713,6 +748,7 @@
             }
         });
 
+        dotsG.selectAll('.hint-dot').remove();
         inputEl.style.display = 'none';
         feedbackEl.style.display = 'none';
         resultsText.innerHTML = `Time's up! You named <strong>${guessed.size}</strong> / ${COUNTRIES.length} countries.`;
@@ -754,9 +790,11 @@
         inputEl.classList.add('correct');
         setTimeout(() => inputEl.classList.remove('correct'), 500);
 
-        // Highlight on map
+        // Highlight on map and remove hint dot
         const el = pathMap.get(country.id);
         if (el) el.classList.add('guessed');
+        const dot = document.getElementById(`dot-${country.id}`);
+        if (dot) dot.remove();
 
         // Add label on map
         const feature = featuresMap.get(country.id);
