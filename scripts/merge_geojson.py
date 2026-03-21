@@ -8,10 +8,16 @@ Usage:
 """
 
 import json
+import hashlib
 import argparse
 from pathlib import Path
 from shapely.geometry import shape, mapping
 from shapely.geometry.polygon import orient
+
+
+def hash_id(iso):
+    """Replace ISO code with a short opaque hash so country IDs aren't guessable."""
+    return hashlib.md5(iso.encode()).hexdigest()[:8]
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--out', default='countries_merged.geojson')
@@ -34,6 +40,8 @@ for path in sorted(Path('countries').glob('*.geo.json')):
         data = json.load(f)
     for feature in data['features']:
         feature['geometry'] = fix_winding(feature['geometry'])
+        if 'id' in feature:
+            feature['id'] = hash_id(feature['id'])
         features.append(feature)
 
 collection = {
