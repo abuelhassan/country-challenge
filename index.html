@@ -461,6 +461,13 @@
             display: none;
             z-index: 50;
         }
+        /* ── Confetti canvas ── */
+        #confetti-canvas {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+        }
     </style>
 </head>
 <body>
@@ -486,6 +493,7 @@
         <input id="country-input" type="text" placeholder="Type a country…" autocomplete="off" disabled/>
     </div>
     <div id="feedback"></div>
+    <canvas id="confetti-canvas"></canvas>
     <div id="results-bar" class="hidden">
         <span id="results-text"></span>
         <button id="play-again-btn">Play Again</button>
@@ -817,6 +825,19 @@
                     .text(country.name);
             }
         }
+
+        // Check if all countries have been guessed
+        if (guessed.size === COUNTRIES.length) {
+            clearInterval(timerInterval);
+            gameActive = false;
+            inputEl.disabled = true;
+            inputEl.style.display = 'none';
+            feedbackEl.style.display = 'none';
+            dotsG.selectAll('.hint-dot').remove();
+            resultsText.innerHTML = `You got all <strong>${COUNTRIES.length}</strong> countries!`;
+            resultsBar.classList.remove('hidden');
+            launchConfetti();
+        }
     }
 
     // ─── Events ──────────────────────────────────────────────────────────────────
@@ -845,6 +866,52 @@
         overlayBtn.textContent = 'Start Game';
         overlayBtn.disabled = false;
     });
+
+    // ─── Confetti ────────────────────────────────────────────────────────────────
+    function launchConfetti() {
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const COLORS = ['#f94144','#f3722c','#f9c74f','#90be6d','#43aa8b','#577590','#a78bfa'];
+        const particles = Array.from({length: 160}, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * -canvas.height,
+            w: 8 + Math.random() * 8,
+            h: 4 + Math.random() * 6,
+            color: COLORS[Math.floor(Math.random() * COLORS.length)],
+            angle: Math.random() * Math.PI * 2,
+            spin: (Math.random() - 0.5) * 0.2,
+            vx: (Math.random() - 0.5) * 3,
+            vy: 3 + Math.random() * 4,
+        }));
+
+        let raf;
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let alive = false;
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.angle += p.spin;
+                if (p.y < canvas.height + 20) alive = true;
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                ctx.restore();
+            });
+            if (alive) {
+                raf = requestAnimationFrame(draw);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+        cancelAnimationFrame(raf);
+        draw();
+    }
 </script>
 </body>
 </html>
