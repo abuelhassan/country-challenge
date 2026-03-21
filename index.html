@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Country Challenge — 15 Minutes</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f1117;
+            color: #e8eaf0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Header ── */
+        #header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #161b27;
+            border-bottom: 1px solid #252d40;
+            flex-shrink: 0;
+            gap: 16px;
+        }
+
+        #title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #7eb8f7;
+            white-space: nowrap;
+        }
+
+        /* Timer */
+        #timer {
+            font-size: 2rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: #7eb8f7;
+            min-width: 90px;
+            text-align: center;
+            transition: color .3s;
+        }
+
+        #timer.warning {
+            color: #f4c150;
+        }
+
+        #timer.danger {
+            color: #f46060;
+            animation: pulse .6s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: .5;
+            }
+        }
+
+        /* Score */
+        #score-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #1e2535;
+            border-radius: 10px;
+            padding: 6px 14px;
+        }
+
+        #score-label {
+            font-size: .75rem;
+            color: #8090b0;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        #score {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #6ee7b7;
+            min-width: 2ch;
+            text-align: center;
+        }
+
+        /* Input */
+        #input-wrap {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            max-width: 380px;
+        }
+
+        #country-input {
+            flex: 1;
+            padding: 8px 14px;
+            border: 2px solid #2e3a55;
+            border-radius: 8px;
+            background: #1a2033;
+            color: #e8eaf0;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color .2s;
+        }
+
+        #country-input:focus {
+            border-color: #7eb8f7;
+        }
+
+        #country-input.correct {
+            border-color: #6ee7b7;
+            animation: flash-green .5s;
+        }
+
+        #country-input.wrong {
+            border-color: #f46060;
+            animation: shake .3s;
+        }
+
+        @keyframes flash-green {
+            0%, 100% {
+                background: #1a2033
+            }
+            40% {
+                background: #1a3d2e
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% {
+                transform: translateX(0)
+            }
+            25% {
+                transform: translateX(-6px)
+            }
+            75% {
+                transform: translateX(6px)
+            }
+        }
+
+        #start-btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #7eb8f7;
+            color: #0f1117;
+            font-weight: 700;
+            font-size: .95rem;
+            cursor: pointer;
+            transition: background .2s, transform .1s;
+            white-space: nowrap;
+        }
+
+        #start-btn:hover {
+            background: #a8d4ff;
+        }
+
+        #start-btn:active {
+            transform: scale(.96);
+        }
+
+        #start-btn:disabled {
+            background: #2e3a55;
+            color: #4a5570;
+            cursor: default;
+        }
+
+        /* Feedback */
+        #feedback {
+            font-size: .85rem;
+            min-width: 120px;
+            text-align: left;
+            height: 1.2em;
+        }
+
+        .fb-ok {
+            color: #6ee7b7;
+        }
+
+        .fb-dup {
+            color: #f4c150;
+        }
+
+        .fb-err {
+            color: #f46060;
+        }
+
+        /* ── Main layout ── */
+        #main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── Map ── */
+        #map-container {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #map-container svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .country-path {
+            fill: #1e2d4a;
+            stroke: #5a7aaa;
+            stroke-width: .5px;
+            transition: fill .4s;
+            cursor: default;
+        }
+
+        .country-path.guessed {
+            fill: #3a9e7a;
+            stroke: #6ee7b7;
+            stroke-width: .6px;
+        }
+
+        .country-path.guessed:hover {
+            fill: #4abf93;
+        }
+
+        /* ── Sidebar ── */
+        #sidebar {
+            width: 220px;
+            background: #161b27;
+            border-left: 1px solid #252d40;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        #sidebar-header {
+            padding: 10px 14px;
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #8090b0;
+            border-bottom: 1px solid #252d40;
+            flex-shrink: 0;
+        }
+
+        #guessed-list {
+            overflow-y: auto;
+            flex: 1;
+            padding: 6px 4px;
+        }
+
+        #guessed-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #guessed-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #guessed-list::-webkit-scrollbar-thumb {
+            background: #2e3a55;
+            border-radius: 2px;
+        }
+
+        .guessed-item {
+            padding: 5px 10px;
+            font-size: .82rem;
+            border-radius: 6px;
+            color: #c0e8d0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            animation: slide-in .25s ease;
+        }
+
+        @keyframes slide-in {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .guessed-item::before {
+            content: '✓';
+            color: #6ee7b7;
+            font-weight: 700;
+            font-size: .75rem;
+        }
+
+        .guessed-item:hover {
+            background: #1e2535;
+        }
+
+        /* ── Overlay (start / end) ── */
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 12, 20, .85);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        #overlay.hidden {
+            display: none;
+        }
+
+        #overlay-box {
+            background: #161b27;
+            border: 1px solid #2e3a55;
+            border-radius: 18px;
+            padding: 40px 48px;
+            text-align: center;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+        }
+
+        #overlay-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: #7eb8f7;
+        }
+
+        #overlay-subtitle {
+            color: #8090b0;
+            margin-bottom: 28px;
+            font-size: .95rem;
+            line-height: 1.5;
+        }
+
+        #overlay-score {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #6ee7b7;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        #overlay-score-label {
+            font-size: .85rem;
+            color: #8090b0;
+            margin-bottom: 28px;
+        }
+
+        #overlay-btn {
+            padding: 12px 36px;
+            border: none;
+            border-radius: 10px;
+            background: #7eb8f7;
+            color: #0f1117;
+            font-weight: 700;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: background .2s, transform .1s;
+        }
+
+        #overlay-btn:hover {
+            background: #a8d4ff;
+        }
+
+        #overlay-btn:active {
+            transform: scale(.97);
+        }
+
+        /* tooltip */
+        #tooltip {
+            position: fixed;
+            background: #1e2535;
+            border: 1px solid #2e3a55;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: .78rem;
+            color: #c0d4f0;
+            pointer-events: none;
+            display: none;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Overlay (end of game only) -->
+<div id="overlay" class="hidden">
+    <div id="overlay-box">
+        <div id="overlay-title"></div>
+        <div id="overlay-subtitle"></div>
+        <div id="overlay-score"></div>
+        <div id="overlay-score-label"></div>
+        <button id="overlay-btn">Play Again</button>
+    </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- Header -->
+<div id="header">
+    <div id="title">Country Challenge</div>
+    <div id="timer">15:00</div>
+    <div id="input-wrap">
+        <input id="country-input" type="text" placeholder="Type a country…" autocomplete="off" disabled/>
+    </div>
+    <div id="feedback"></div>
+    <div id="score-box">
+        <span id="score-label">Score</span>
+        <span id="score">0</span>
+        <span id="score-label">/ <span id="total-countries"></span></span>
+    </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+    <div id="map-container"></div>
+    <div id="sidebar">
+        <div id="sidebar-header">Guessed Countries</div>
+        <div id="guessed-list"></div>
+    </div>
+</div>
+
+<script>
+    // ─── Country data: name → ISO 3166-1 alpha-3 id (matches countries_merged.geojson) ───
+    const COUNTRY_LIST = [
+        {id: 'AFG', name: 'Afghanistan'},
+        {id: 'ALB', name: 'Albania'},
+        {id: 'DZA', name: 'Algeria'},
+        {id: 'AGO', name: 'Angola'},
+        {id: 'ARG', name: 'Argentina'},
+        {id: 'ARM', name: 'Armenia'},
+        {id: 'AUS', name: 'Australia'},
+        {id: 'AUT', name: 'Austria'},
+        {id: 'AZE', name: 'Azerbaijan'},
+        {id: 'BGD', name: 'Bangladesh'},
+        {id: 'BLR', name: 'Belarus'},
+        {id: 'BEL', name: 'Belgium'},
+        {id: 'BLZ', name: 'Belize'},
+        {id: 'BEN', name: 'Benin'},
+        {id: 'BMU', name: 'Bermuda'},
+        {id: 'BTN', name: 'Bhutan'},
+        {id: 'BOL', name: 'Bolivia'},
+        {id: 'BIH', name: 'Bosnia and Herzegovina'},
+        {id: 'BWA', name: 'Botswana'},
+        {id: 'BRA', name: 'Brazil'},
+        {id: 'BRN', name: 'Brunei'},
+        {id: 'BGR', name: 'Bulgaria'},
+        {id: 'BFA', name: 'Burkina Faso'},
+        {id: 'BDI', name: 'Burundi'},
+        {id: 'KHM', name: 'Cambodia'},
+        {id: 'CMR', name: 'Cameroon'},
+        {id: 'CAN', name: 'Canada'},
+        {id: 'CAF', name: 'Central African Republic'},
+        {id: 'TCD', name: 'Chad'},
+        {id: 'CHL', name: 'Chile'},
+        {id: 'CHN', name: 'China'},
+        {id: 'COL', name: 'Colombia'},
+        {id: 'CRI', name: 'Costa Rica'},
+        {id: 'HRV', name: 'Croatia'},
+        {id: 'CUB', name: 'Cuba'},
+        {id: 'CYP', name: 'Cyprus'},
+        {id: 'CZE', name: 'Czech Republic'},
+        {id: 'COD', name: 'Democratic Republic of the Congo'},
+        {id: 'DNK', name: 'Denmark'},
+        {id: 'DJI', name: 'Djibouti'},
+        {id: 'DOM', name: 'Dominican Republic'},
+        {id: 'TLS', name: 'East Timor'},
+        {id: 'ECU', name: 'Ecuador'},
+        {id: 'EGY', name: 'Egypt'},
+        {id: 'SLV', name: 'El Salvador'},
+        {id: 'GNQ', name: 'Equatorial Guinea'},
+        {id: 'ERI', name: 'Eritrea'},
+        {id: 'EST', name: 'Estonia'},
+        {id: 'ETH', name: 'Ethiopia'},
+        {id: 'FJI', name: 'Fiji'},
+        {id: 'FIN', name: 'Finland'},
+        {id: 'FRA', name: 'France'},
+        {id: 'GAB', name: 'Gabon'},
+        {id: 'GMB', name: 'Gambia'},
+        {id: 'GEO', name: 'Georgia'},
+        {id: 'DEU', name: 'Germany'},
+        {id: 'GHA', name: 'Ghana'},
+        {id: 'GRC', name: 'Greece'},
+        {id: 'GTM', name: 'Guatemala'},
+        {id: 'GIN', name: 'Guinea'},
+        {id: 'GNB', name: 'Guinea Bissau'},
+        {id: 'GUY', name: 'Guyana'},
+        {id: 'HTI', name: 'Haiti'},
+        {id: 'HND', name: 'Honduras'},
+        {id: 'HUN', name: 'Hungary'},
+        {id: 'ISL', name: 'Iceland'},
+        {id: 'IND', name: 'India'},
+        {id: 'IDN', name: 'Indonesia'},
+        {id: 'IRN', name: 'Iran'},
+        {id: 'IRQ', name: 'Iraq'},
+        {id: 'IRL', name: 'Ireland'},
+        {id: 'ITA', name: 'Italy'},
+        {id: 'CIV', name: 'Ivory Coast'},
+        {id: 'JAM', name: 'Jamaica'},
+        {id: 'JPN', name: 'Japan'},
+        {id: 'JOR', name: 'Jordan'},
+        {id: 'KAZ', name: 'Kazakhstan'},
+        {id: 'KEN', name: 'Kenya'},
+        {id: 'CS-KM', name: 'Kosovo'},
+        {id: 'KWT', name: 'Kuwait'},
+        {id: 'KGZ', name: 'Kyrgyzstan'},
+        {id: 'LAO', name: 'Laos'},
+        {id: 'LVA', name: 'Latvia'},
+        {id: 'LBN', name: 'Lebanon'},
+        {id: 'LSO', name: 'Lesotho'},
+        {id: 'LBR', name: 'Liberia'},
+        {id: 'LBY', name: 'Libya'},
+        {id: 'LTU', name: 'Lithuania'},
+        {id: 'LUX', name: 'Luxembourg'},
+        {id: 'MKD', name: 'Macedonia'},
+        {id: 'MDG', name: 'Madagascar'},
+        {id: 'MWI', name: 'Malawi'},
+        {id: 'MYS', name: 'Malaysia'},
+        {id: 'MLI', name: 'Mali'},
+        {id: 'MLT', name: 'Malta'},
+        {id: 'MRT', name: 'Mauritania'},
+        {id: 'MEX', name: 'Mexico'},
+        {id: 'MDA', name: 'Moldova'},
+        {id: 'MNG', name: 'Mongolia'},
+        {id: 'MNE', name: 'Montenegro'},
+        {id: 'MAR', name: 'Morocco'},
+        {id: 'MOZ', name: 'Mozambique'},
+        {id: 'MMR', name: 'Myanmar'},
+        {id: 'NAM', name: 'Namibia'},
+        {id: 'NPL', name: 'Nepal'},
+        {id: 'NLD', name: 'Netherlands'},
+        {id: 'NZL', name: 'New Zealand'},
+        {id: 'NIC', name: 'Nicaragua'},
+        {id: 'NER', name: 'Niger'},
+        {id: 'NGA', name: 'Nigeria'},
+        {id: 'PRK', name: 'North Korea'},
+        {id: 'NOR', name: 'Norway'},
+        {id: 'OMN', name: 'Oman'},
+        {id: 'PAK', name: 'Pakistan'},
+        {id: 'PAN', name: 'Panama'},
+        {id: 'PNG', name: 'Papua New Guinea'},
+        {id: 'PRY', name: 'Paraguay'},
+        {id: 'PER', name: 'Peru'},
+        {id: 'PHL', name: 'Philippines'},
+        {id: 'POL', name: 'Poland'},
+        {id: 'PRT', name: 'Portugal'},
+        {id: 'QAT', name: 'Qatar'},
+        {id: 'SRB', name: 'Republic of Serbia'},
+        {id: 'COG', name: 'Republic of the Congo'},
+        {id: 'ROU', name: 'Romania'},
+        {id: 'RUS', name: 'Russia'},
+        {id: 'RWA', name: 'Rwanda'},
+        {id: 'SAU', name: 'Saudi Arabia'},
+        {id: 'SEN', name: 'Senegal'},
+        {id: 'SLE', name: 'Sierra Leone'},
+        {id: 'SVK', name: 'Slovakia'},
+        {id: 'SVN', name: 'Slovenia'},
+        {id: 'SLB', name: 'Solomon Islands'},
+        {id: 'SOM', name: 'Somalia'},
+        {id: 'ZAF', name: 'South Africa'},
+        {id: 'KOR', name: 'South Korea'},
+        {id: 'ESP', name: 'Spain'},
+        {id: 'LKA', name: 'Sri Lanka'},
+        {id: 'SDN', name: 'Sudan'},
+        {id: 'SUR', name: 'Suriname'},
+        {id: 'SWZ', name: 'Swaziland'},
+        {id: 'SWE', name: 'Sweden'},
+        {id: 'CHE', name: 'Switzerland'},
+        {id: 'SYR', name: 'Syria'},
+        {id: 'TWN', name: 'Taiwan'},
+        {id: 'TJK', name: 'Tajikistan'},
+        {id: 'THA', name: 'Thailand'},
+        {id: 'BHS', name: 'The Bahamas'},
+        {id: 'TGO', name: 'Togo'},
+        {id: 'TTO', name: 'Trinidad and Tobago'},
+        {id: 'TUN', name: 'Tunisia'},
+        {id: 'TUR', name: 'Turkey'},
+        {id: 'TKM', name: 'Turkmenistan'},
+        {id: 'UGA', name: 'Uganda'},
+        {id: 'UKR', name: 'Ukraine'},
+        {id: 'ARE', name: 'United Arab Emirates'},
+        {id: 'GBR', name: 'United Kingdom'},
+        {id: 'TZA', name: 'United Republic of Tanzania'},
+        {id: 'USA', name: 'United States of America'},
+        {id: 'URY', name: 'Uruguay'},
+        {id: 'UZB', name: 'Uzbekistan'},
+        {id: 'VUT', name: 'Vanuatu'},
+        {id: 'VEN', name: 'Venezuela'},
+        {id: 'VNM', name: 'Vietnam'},
+        {id: 'PSE', name: 'Palestine'},
+        {id: 'ESH', name: 'Western Sahara'},
+        {id: 'YEM', name: 'Yemen'},
+        {id: 'ZMB', name: 'Zambia'},
+        {id: 'ZWE', name: 'Zimbabwe'},
+    ];
+
+    const COUNTRIES = COUNTRY_LIST;
+
+    // Build lookup: normalised name → country object
+    const lookup = new Map();
+
+    function norm(s) {
+        return s.toLowerCase().trim().replace(/['']/g, "'");
+    }
+
+    COUNTRIES.forEach(c => lookup.set(norm(c.name), c));
+    document.getElementById('total-countries').textContent = COUNTRIES.length;
+
+    // ─── Game state ─────────────────────────────────────────────────────────────
+    const TOTAL_SECONDS = 15 * 60;
+    let secondsLeft = TOTAL_SECONDS;
+    let timerInterval = null;
+    let guessed = new Set(); // ids of guessed countries
+    let gameActive = false;
+    let timerStarted = false;
+    let pathMap = new Map(); // alpha-3 id → SVG path element
+
+    // ─── DOM refs ────────────────────────────────────────────────────────────────
+    const timerEl = document.getElementById('timer');
+    const scoreEl = document.getElementById('score');
+    const inputEl = document.getElementById('country-input');
+    const feedbackEl = document.getElementById('feedback');
+    const listEl = document.getElementById('guessed-list');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.querySelector('#overlay-box #overlay-title');
+    const overlaySubtitle = document.querySelector('#overlay-box #overlay-subtitle');
+    const overlayScore = document.querySelector('#overlay-box #overlay-score');
+    const overlayScoreLabel = document.querySelector('#overlay-box #overlay-score-label');
+    const overlayBtn = document.getElementById('overlay-btn');
+    const tooltip = document.getElementById('tooltip');
+
+    // ─── Map setup (D3 + TopoJSON) ───────────────────────────────────────────────
+    const container = document.getElementById('map-container');
+    const svg = d3.select(container).append('svg');
+    const g = svg.append('g');
+
+    const projection = d3.geoNaturalEarth1();
+    const path = d3.geoPath().projection(projection);
+
+    // Zoom behaviour
+    const zoom = d3.zoom()
+        .scaleExtent([1, 12])
+        .on('zoom', e => g.attr('transform', e.transform));
+    svg.call(zoom);
+
+    function fitMap() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        svg.attr('viewBox', `0 0 ${w} ${h}`);
+        projection.fitSize([w, h], {type: 'Sphere'});
+        path.projection(projection);
+        g.selectAll('.country-path').attr('d', path);
+        g.selectAll('.graticule').attr('d', path);
+        g.selectAll('.sphere').attr('d', path);
+    }
+
+    // Build reverse lookup: alpha-3 id → country (for tooltip)
+    const idLookup = new Map();
+    COUNTRIES.forEach(c => idLookup.set(c.id, c));
+
+    // Load world GeoJSON
+    fetch('countries_merged.geojson')
+        .then(r => r.json())
+        .then(world => {
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            svg.attr('viewBox', `0 0 ${w} ${h}`);
+            projection.fitSize([w, h], {type: 'Sphere'});
+
+            // Ocean
+            g.append('path')
+                .datum({type: 'Sphere'})
+                .attr('class', 'sphere')
+                .attr('d', path)
+                .attr('fill', '#0d1929');
+
+            // Graticule
+            g.append('path')
+                .datum(d3.geoGraticule()())
+                .attr('class', 'graticule')
+                .attr('d', path)
+                .attr('fill', 'none')
+                .attr('stroke', '#162033')
+                .attr('stroke-width', .3);
+
+            // Countries
+            const features = world.features;
+            g.selectAll('.country-path')
+                .data(features)
+                .join('path')
+                .attr('class', 'country-path')
+                .attr('d', path)
+                .attr('id', d => `c-${d.id}`)
+                .on('mousemove', (e, d) => {
+                    const country = idLookup.get(d.id);
+                    if (country && guessed.has(country.id)) {
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = (e.clientX + 12) + 'px';
+                        tooltip.style.top = (e.clientY - 24) + 'px';
+                        tooltip.textContent = country.name;
+                    }
+                })
+                .on('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
+
+            // Build path map: alpha-3 id → SVG element
+            features.forEach(f => {
+                const el = document.getElementById(`c-${f.id}`);
+                if (el) pathMap.set(f.id, el);
+            });
+
+            // Enable input once map is ready
+            gameActive = true;
+            inputEl.disabled = false;
+            inputEl.focus();
+        })
+        .catch(() => {
+            overlaySubtitle.textContent = 'Failed to load map. Check your internet connection and refresh.';
+        });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(fitMap, 150);
+    });
+
+    // ─── Timer ───────────────────────────────────────────────────────────────────
+    function updateTimer() {
+        const m = Math.floor(secondsLeft / 60);
+        const s = secondsLeft % 60;
+        timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        timerEl.className = secondsLeft <= 60 ? 'danger' : secondsLeft <= 180 ? 'warning' : '';
+        if (secondsLeft <= 0) endGame();
+    }
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            secondsLeft--;
+            updateTimer();
+        }, 1000);
+    }
+
+    // ─── Game logic ──────────────────────────────────────────────────────────────
+    function resetGame() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        guessed.clear();
+        secondsLeft = TOTAL_SECONDS;
+        gameActive = true;
+        timerStarted = false;
+        listEl.innerHTML = '';
+        scoreEl.textContent = '0';
+        updateTimer();
+        overlay.classList.add('hidden');
+        // Reset all highlighted countries
+        pathMap.forEach(el => el.classList.remove('guessed'));
+        inputEl.disabled = false;
+        inputEl.focus();
+    }
+
+    function endGame() {
+        clearInterval(timerInterval);
+        gameActive = false;
+        inputEl.disabled = true;
+        overlay.classList.remove('hidden');
+
+        overlayTitle.textContent = 'Time\'s Up!';
+        overlaySubtitle.textContent = `You named ${guessed.size} out of ${COUNTRIES.length} countries.`;
+        overlayScore.textContent = guessed.size;
+        overlayScoreLabel.textContent = `/ ${COUNTRIES.length} countries`;
+    }
+
+    function setFeedback(msg, cls) {
+        feedbackEl.textContent = msg;
+        feedbackEl.className = cls;
+        clearTimeout(feedbackEl._t);
+        feedbackEl._t = setTimeout(() => {
+            feedbackEl.textContent = '';
+            feedbackEl.className = '';
+        }, 1500);
+    }
+
+    function guess(raw) {
+        const key = norm(raw);
+        if (!key) return;
+        const country = lookup.get(key);
+        if (!country) {
+            setFeedback('Not found', 'fb-err');
+            inputEl.classList.add('wrong');
+            setTimeout(() => inputEl.classList.remove('wrong'), 400);
+            return;
+        }
+        if (guessed.has(country.id)) {
+            setFeedback('Already got it!', 'fb-dup');
+            return;
+        }
+        // Correct!
+        if (!timerStarted) {
+            timerStarted = true;
+            startTimer();
+        }
+        guessed.add(country.id);
+        scoreEl.textContent = guessed.size;
+        setFeedback(`✓ ${country.name}`, 'fb-ok');
+        inputEl.classList.add('correct');
+        setTimeout(() => inputEl.classList.remove('correct'), 500);
+
+        // Highlight on map
+        const el = pathMap.get(country.id);
+        if (el) el.classList.add('guessed');
+
+        // Add to sidebar
+        const item = document.createElement('div');
+        item.className = 'guessed-item';
+        item.textContent = country.name;
+        listEl.prepend(item);
+    }
+
+    // ─── Events ──────────────────────────────────────────────────────────────────
+    inputEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && gameActive) {
+            const val = inputEl.value;
+            guess(val);
+            inputEl.value = '';
+            e.preventDefault();
+        }
+    });
+
+    overlayBtn.addEventListener('click', () => {
+        overlayBtn.disabled = true;
+        startGame();
+    });
+
+    startBtn.addEventListener('click', () => {
+        overlay.classList.remove('hidden');
+        overlayTitle.textContent = 'Country Challenge';
+        overlaySubtitle.innerHTML = `You have <strong>15 minutes</strong> to name as many countries as possible.<br>Type a country name and press <strong>Enter</strong>.`;
+        overlayScore.style.display = 'none';
+        overlayScoreLabel.style.display = 'none';
+        overlayBtn.textContent = 'Start Game';
+        overlayBtn.disabled = false;
+    });
+</script>
+</body>
+</html>
