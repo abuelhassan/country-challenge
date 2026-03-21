@@ -549,7 +549,7 @@
     const g = svg.append('g');
     const dotsG = svg.append('g'); // rendered on top of everything in g
 
-    const projection = d3.geoNaturalEarth1().rotate([-30, 0]);
+    const projection = d3.geoNaturalEarth1().rotate([-16, 0]);
     const path = d3.geoPath().projection(projection);
 
     // Zoom behaviour
@@ -574,7 +574,7 @@
             const id = d3.select(this).attr('data-id');
             const feature = featuresMap.get(id);
             if (feature) {
-                const c = path.centroid(feature);
+                const c = projection(d3.geoCentroid(feature)) || [NaN, NaN];
                 if (!isNaN(c[0])) d3.select(this).attr('x', c[0]).attr('y', c[1]);
             }
         });
@@ -582,7 +582,7 @@
             const id = d3.select(this).attr('id').replace('dot-', '');
             const feature = featuresMap.get(id);
             if (feature) {
-                const c = path.centroid(feature);
+                const c = projection(d3.geoCentroid(feature)) || [NaN, NaN];
                 if (!isNaN(c[0])) d3.select(this).attr('cx', c[0]).attr('cy', c[1]);
             }
         });
@@ -655,7 +655,7 @@
                 featuresMap.set(f.id, f);
 
                 if (idLookup.has(f.id)) {
-                    const c = path.centroid(f);
+                    const c = projection(d3.geoCentroid(f)) || [NaN, NaN];
                     if (!isNaN(c[0])) {
                         dotsG.append('circle')
                             .attr('class', 'hint-dot')
@@ -710,7 +710,7 @@
         dotsG.selectAll('.hint-dot').remove();
         featuresMap.forEach((f, id) => {
             if (!idLookup.has(id)) return;
-            const c = path.centroid(f);
+            const c = projection(d3.geoCentroid(f)) || [NaN, NaN];
             if (!isNaN(c[0])) {
                 dotsG.append('circle')
                     .attr('class', 'hint-dot')
@@ -744,7 +744,7 @@
             if (el) el.classList.add('missed');
             const feature = featuresMap.get(country.id);
             if (feature) {
-                const c = path.centroid(feature);
+                const c = projection(d3.geoCentroid(feature)) || [NaN, NaN];
                 if (!isNaN(c[0])) {
                     g.append('text')
                         .attr('class', 'country-label missed')
@@ -807,7 +807,7 @@
         // Add label on map
         const feature = featuresMap.get(country.id);
         if (feature) {
-            const c = path.centroid(feature);
+            const c = projection(d3.geoCentroid(feature)) || [NaN, NaN];
             if (!isNaN(c[0])) {
                 g.append('text')
                     .attr('class', 'country-label')
