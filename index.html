@@ -445,220 +445,14 @@
 </div>
 
 <script>
-    // ─── Country data: name → ISO 3166-1 alpha-3 id (matches countries_merged.geojson) ───
-    const COUNTRY_LIST = [
-        {id: 'AFG', name: 'Afghanistan', alts: []},
-        {id: 'ALB', name: 'Albania', alts: []},
-        {id: 'DZA', name: 'Algeria', alts: []},
-        {id: 'AGO', name: 'Angola', alts: []},
-        {id: 'ARG', name: 'Argentina', alts: []},
-        {id: 'ARM', name: 'Armenia', alts: []},
-        {id: 'AUS', name: 'Australia', alts: []},
-        {id: 'AUT', name: 'Austria', alts: []},
-        {id: 'AZE', name: 'Azerbaijan', alts: []},
-        {id: 'BGD', name: 'Bangladesh', alts: []},
-        {id: 'BLR', name: 'Belarus', alts: []},
-        {id: 'BEL', name: 'Belgium', alts: []},
-        {id: 'BLZ', name: 'Belize', alts: []},
-        {id: 'BEN', name: 'Benin', alts: []},
-        {id: 'BTN', name: 'Bhutan', alts: []},
-        {id: 'BOL', name: 'Bolivia', alts: []},
-        {id: 'BIH', name: 'Bosnia and Herzegovina', alts: ['Bosnia']},
-        {id: 'BWA', name: 'Botswana', alts: []},
-        {id: 'BRA', name: 'Brazil', alts: []},
-        {id: 'BRN', name: 'Brunei', alts: []},
-        {id: 'BGR', name: 'Bulgaria', alts: []},
-        {id: 'BFA', name: 'Burkina Faso', alts: []},
-        {id: 'BDI', name: 'Burundi', alts: []},
-        {id: 'KHM', name: 'Cambodia', alts: []},
-        {id: 'CMR', name: 'Cameroon', alts: []},
-        {id: 'CAN', name: 'Canada', alts: []},
-        {id: 'CAF', name: 'Central African Republic', alts: []},
-        {id: 'TCD', name: 'Chad', alts: []},
-        {id: 'CHL', name: 'Chile', alts: []},
-        {id: 'CHN', name: 'China', alts: []},
-        {id: 'COL', name: 'Colombia', alts: []},
-        {id: 'CRI', name: 'Costa Rica', alts: []},
-        {id: 'HRV', name: 'Croatia', alts: []},
-        {id: 'CUB', name: 'Cuba', alts: []},
-        {id: 'CYP', name: 'Cyprus', alts: []},
-        {id: 'CZE', name: 'Czech Republic', alts: ['Czechia']},
-        {id: 'COD', name: 'Democratic Republic of the Congo', alts: ['DRC', 'Democratic Republic of Congo']},
-        {id: 'DNK', name: 'Denmark', alts: []},
-        {id: 'DJI', name: 'Djibouti', alts: []},
-        {id: 'DOM', name: 'Dominican Republic', alts: []},
-        {id: 'TLS', name: 'East Timor', alts: ['Timor-Leste', 'Timor Leste']},
-        {id: 'ECU', name: 'Ecuador', alts: []},
-        {id: 'EGY', name: 'Egypt', alts: []},
-        {id: 'SLV', name: 'El Salvador', alts: []},
-        {id: 'GNQ', name: 'Equatorial Guinea', alts: []},
-        {id: 'ERI', name: 'Eritrea', alts: []},
-        {id: 'EST', name: 'Estonia', alts: []},
-        {id: 'ETH', name: 'Ethiopia', alts: []},
-        {id: 'FJI', name: 'Fiji', alts: []},
-        {id: 'FIN', name: 'Finland', alts: []},
-        {id: 'FRA', name: 'France', alts: []},
-        {id: 'GAB', name: 'Gabon', alts: []},
-        {id: 'GMB', name: 'Gambia', alts: ['The Gambia']},
-        {id: 'GEO', name: 'Georgia', alts: []},
-        {id: 'DEU', name: 'Germany', alts: []},
-        {id: 'GHA', name: 'Ghana', alts: []},
-        {id: 'GRC', name: 'Greece', alts: []},
-        {id: 'GTM', name: 'Guatemala', alts: []},
-        {id: 'GIN', name: 'Guinea', alts: []},
-        {id: 'GNB', name: 'Guinea Bissau', alts: ['Guinea-Bissau']},
-        {id: 'GUY', name: 'Guyana', alts: []},
-        {id: 'HTI', name: 'Haiti', alts: []},
-        {id: 'HND', name: 'Honduras', alts: []},
-        {id: 'HUN', name: 'Hungary', alts: []},
-        {id: 'ISL', name: 'Iceland', alts: []},
-        {id: 'IND', name: 'India', alts: []},
-        {id: 'IDN', name: 'Indonesia', alts: []},
-        {id: 'IRN', name: 'Iran', alts: []},
-        {id: 'IRQ', name: 'Iraq', alts: []},
-        {id: 'IRL', name: 'Ireland', alts: []},
-        {id: 'ITA', name: 'Italy', alts: []},
-        {id: 'CIV', name: 'Ivory Coast', alts: ["Cote d'Ivoire", "Côte d'Ivoire"]},
-        {id: 'JAM', name: 'Jamaica', alts: []},
-        {id: 'JPN', name: 'Japan', alts: []},
-        {id: 'JOR', name: 'Jordan', alts: []},
-        {id: 'KAZ', name: 'Kazakhstan', alts: []},
-        {id: 'KEN', name: 'Kenya', alts: []},
-        {id: 'CS-KM', name: 'Kosovo', alts: []},
-        {id: 'KWT', name: 'Kuwait', alts: []},
-        {id: 'KGZ', name: 'Kyrgyzstan', alts: []},
-        {id: 'LAO', name: 'Laos', alts: []},
-        {id: 'LVA', name: 'Latvia', alts: []},
-        {id: 'LBN', name: 'Lebanon', alts: []},
-        {id: 'LSO', name: 'Lesotho', alts: []},
-        {id: 'LBR', name: 'Liberia', alts: []},
-        {id: 'LBY', name: 'Libya', alts: []},
-        {id: 'LTU', name: 'Lithuania', alts: []},
-        {id: 'LUX', name: 'Luxembourg', alts: []},
-        {id: 'MKD', name: 'Macedonia', alts: ['North Macedonia']},
-        {id: 'MDG', name: 'Madagascar', alts: []},
-        {id: 'MWI', name: 'Malawi', alts: []},
-        {id: 'MYS', name: 'Malaysia', alts: []},
-        {id: 'MLI', name: 'Mali', alts: []},
-        {id: 'MLT', name: 'Malta', alts: []},
-        {id: 'MRT', name: 'Mauritania', alts: []},
-        {id: 'MEX', name: 'Mexico', alts: []},
-        {id: 'MDA', name: 'Moldova', alts: []},
-        {id: 'MNG', name: 'Mongolia', alts: []},
-        {id: 'MNE', name: 'Montenegro', alts: []},
-        {id: 'MAR', name: 'Morocco', alts: []},
-        {id: 'MOZ', name: 'Mozambique', alts: []},
-        {id: 'MMR', name: 'Myanmar', alts: ['Burma']},
-        {id: 'NAM', name: 'Namibia', alts: []},
-        {id: 'NPL', name: 'Nepal', alts: []},
-        {id: 'NLD', name: 'Netherlands', alts: []},
-        {id: 'NZL', name: 'New Zealand', alts: []},
-        {id: 'NIC', name: 'Nicaragua', alts: []},
-        {id: 'NER', name: 'Niger', alts: []},
-        {id: 'NGA', name: 'Nigeria', alts: []},
-        {id: 'PRK', name: 'North Korea', alts: []},
-        {id: 'NOR', name: 'Norway', alts: []},
-        {id: 'OMN', name: 'Oman', alts: []},
-        {id: 'PAK', name: 'Pakistan', alts: []},
-        {id: 'PAN', name: 'Panama', alts: []},
-        {id: 'PNG', name: 'Papua New Guinea', alts: []},
-        {id: 'PRY', name: 'Paraguay', alts: []},
-        {id: 'PER', name: 'Peru', alts: []},
-        {id: 'PHL', name: 'Philippines', alts: ['The Philippines']},
-        {id: 'POL', name: 'Poland', alts: []},
-        {id: 'PRT', name: 'Portugal', alts: []},
-        {id: 'QAT', name: 'Qatar', alts: []},
-        {id: 'SRB', name: 'Republic of Serbia', alts: ['Serbia']},
-        {id: 'COG', name: 'Republic of the Congo', alts: ['Congo']},
-        {id: 'ROU', name: 'Romania', alts: []},
-        {id: 'RUS', name: 'Russia', alts: []},
-        {id: 'RWA', name: 'Rwanda', alts: []},
-        {id: 'SAU', name: 'Saudi Arabia', alts: []},
-        {id: 'SEN', name: 'Senegal', alts: []},
-        {id: 'SLE', name: 'Sierra Leone', alts: []},
-        {id: 'SVK', name: 'Slovakia', alts: []},
-        {id: 'SVN', name: 'Slovenia', alts: []},
-        {id: 'SLB', name: 'Solomon Islands', alts: []},
-        {id: 'SOM', name: 'Somalia', alts: []},
-        {id: 'ZAF', name: 'South Africa', alts: []},
-        {id: 'KOR', name: 'South Korea', alts: []},
-        {id: 'ESP', name: 'Spain', alts: []},
-        {id: 'LKA', name: 'Sri Lanka', alts: []},
-        {id: 'SDN', name: 'Sudan', alts: []},
-        {id: 'SUR', name: 'Suriname', alts: []},
-        {id: 'SWZ', name: 'Swaziland', alts: ['Eswatini']},
-        {id: 'SWE', name: 'Sweden', alts: []},
-        {id: 'CHE', name: 'Switzerland', alts: []},
-        {id: 'SYR', name: 'Syria', alts: []},
-        {id: 'TWN', name: 'Taiwan', alts: []},
-        {id: 'TJK', name: 'Tajikistan', alts: []},
-        {id: 'THA', name: 'Thailand', alts: []},
-        {id: 'BHS', name: 'The Bahamas', alts: ['Bahamas']},
-        {id: 'TGO', name: 'Togo', alts: []},
-        {id: 'TTO', name: 'Trinidad and Tobago', alts: ['Trinidad', 'Trinidad & Tobago']},
-        {id: 'TUN', name: 'Tunisia', alts: []},
-        {id: 'TUR', name: 'Turkey', alts: ['Türkiye', 'Turkiye']},
-        {id: 'TKM', name: 'Turkmenistan', alts: []},
-        {id: 'UGA', name: 'Uganda', alts: []},
-        {id: 'UKR', name: 'Ukraine', alts: []},
-        {id: 'ARE', name: 'United Arab Emirates', alts: ['UAE']},
-        {id: 'GBR', name: 'United Kingdom', alts: ['UK']},
-        {id: 'TZA', name: 'United Republic of Tanzania', alts: ['Tanzania']},
-        {id: 'USA', name: 'United States of America', alts: ['United States']},
-        {id: 'URY', name: 'Uruguay', alts: []},
-        {id: 'UZB', name: 'Uzbekistan', alts: []},
-        {id: 'VUT', name: 'Vanuatu', alts: []},
-        {id: 'VEN', name: 'Venezuela', alts: []},
-        {id: 'VNM', name: 'Vietnam', alts: []},
-        {id: 'PSE', name: 'Palestine', alts: []},
-        {id: 'ESH', name: 'Western Sahara', alts: []},
-        {id: 'YEM', name: 'Yemen', alts: []},
-        {id: 'ZMB', name: 'Zambia', alts: []},
-        {id: 'ZWE', name: 'Zimbabwe', alts: []},
-        {id: 'AND', name: 'Andorra', alts: []},
-        {id: 'BHR', name: 'Bahrain', alts: []},
-        {id: 'BRB', name: 'Barbados', alts: []},
-        {id: 'COM', name: 'Comoros', alts: []},
-        {id: 'CPV', name: 'Cape Verde', alts: ['Cabo Verde']},
-        {id: 'DMA', name: 'Dominica', alts: []},
-        {id: 'GRD', name: 'Grenada', alts: []},
-        {id: 'KIR', name: 'Kiribati', alts: []},
-        {id: 'MHL', name: 'Marshall Islands', alts: []},
-        {id: 'MUS', name: 'Mauritius', alts: []},
-        {id: 'NRU', name: 'Nauru', alts: []},
-        {id: 'PLW', name: 'Palau', alts: []},
-        {id: 'STP', name: 'São Tomé and Príncipe', alts: ['Sao Tome and Principe', 'Sao Tome']},
-        {id: 'SYC', name: 'Seychelles', alts: []},
-        {id: 'TON', name: 'Tonga', alts: []},
-        {id: 'TUV', name: 'Tuvalu', alts: []},
-        {id: 'VAT', name: 'Vatican City', alts: ['Vatican']},
-        {id: 'VCT', name: 'Saint Vincent and the Grenadines', alts: ['Saint Vincent', 'St Vincent', 'St. Vincent']},
-        {id: 'WSM', name: 'Samoa', alts: []},
-        {id: 'ATG', name: 'Antigua and Barbuda', alts: []},
-        {id: 'FSM', name: 'Micronesia', alts: ['Federated States of Micronesia']},
-        {id: 'KNA', name: 'Saint Kitts and Nevis', alts: ['St Kitts', 'St. Kitts', 'Saint Kitts', 'St Kitts and Nevis', 'St. Kitts and Nevis']},
-        {id: 'LCA', name: 'Saint Lucia', alts: ['St Lucia', 'St. Lucia']},
-        {id: 'LIE', name: 'Liechtenstein', alts: []},
-        {id: 'MCO', name: 'Monaco', alts: []},
-        {id: 'MDV', name: 'Maldives', alts: []},
-        {id: 'SGP', name: 'Singapore', alts: []},
-        {id: 'SMR', name: 'San Marino', alts: []},
-    ];
+    // Country data is loaded from countries_merged.geojson (game_name/alts in properties)
+    let COUNTRIES = [];
 
-    const COUNTRIES = COUNTRY_LIST;
-
-    // Build lookup: normalised name → country object
     const lookup = new Map();
 
     function norm(s) {
         return s.toLowerCase().trim().replace(/['']/g, "'");
     }
-
-    COUNTRIES.forEach(c => {
-        lookup.set(norm(c.name), c);
-        c.alts.forEach(alt => lookup.set(norm(alt), c));
-    });
-    document.getElementById('total-countries').textContent = COUNTRIES.length;
 
     // ─── Game state ─────────────────────────────────────────────────────────────
     const TOTAL_SECONDS = 15 * 60;
@@ -717,14 +511,24 @@
         });
     }
 
-    // Build reverse lookup: alpha-3 id → country (for tooltip)
+    // id → country object (for tooltip); populated after GeoJSON loads
     const idLookup = new Map();
-    COUNTRIES.forEach(c => idLookup.set(c.id, c));
 
     // Load world GeoJSON
     fetch('countries_merged.geojson')
         .then(r => r.json())
         .then(world => {
+            // Build COUNTRIES and lookups from GeoJSON properties
+            world.features.forEach(f => {
+                if (!f.properties.game_name) return;
+                const c = {id: f.id, name: f.properties.game_name, alts: f.properties.alts || []};
+                COUNTRIES.push(c);
+                lookup.set(norm(c.name), c);
+                c.alts.forEach(alt => lookup.set(norm(alt), c));
+                idLookup.set(c.id, c);
+            });
+            document.getElementById('total-countries').textContent = COUNTRIES.length;
+
             const w = container.clientWidth;
             const h = container.clientHeight;
             svg.attr('viewBox', `0 0 ${w} ${h}`);
