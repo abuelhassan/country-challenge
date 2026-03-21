@@ -236,13 +236,7 @@
 
         /* ── Sidebar ── */
         #sidebar {
-            width: 220px;
-            background: #161b27;
-            border-left: 1px solid #252d40;
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-            overflow: hidden;
+            display: none;
         }
 
         #sidebar-header {
@@ -380,6 +374,20 @@
 
         #overlay-btn:active {
             transform: scale(.97);
+        }
+
+        /* Country labels on map */
+        .country-label {
+            font-size: 7px;
+            fill: #e8f4e8;
+            stroke: #0a1020;
+            stroke-width: 2.5px;
+            paint-order: stroke fill;
+            pointer-events: none;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-weight: 700;
+            text-anchor: middle;
+            dominant-baseline: middle;
         }
 
         /* tooltip */
@@ -659,7 +667,8 @@
     let guessed = new Set(); // ids of guessed countries
     let gameActive = false;
     let timerStarted = false;
-    let pathMap = new Map(); // alpha-3 id → SVG path element
+    let pathMap = new Map();     // alpha-3 id → SVG path element
+    let featuresMap = new Map(); // alpha-3 id → GeoJSON feature
 
     // ─── DOM refs ────────────────────────────────────────────────────────────────
     const timerEl = document.getElementById('timer');
@@ -680,7 +689,7 @@
     const svg = d3.select(container).append('svg');
     const g = svg.append('g');
 
-    const projection = d3.geoNaturalEarth1();
+    const projection = d3.geoNaturalEarth1().rotate([-30, 0]);
     const path = d3.geoPath().projection(projection);
 
     // Zoom behaviour
@@ -698,6 +707,14 @@
         g.selectAll('.country-path').attr('d', path);
         g.selectAll('.graticule').attr('d', path);
         g.selectAll('.sphere').attr('d', path);
+        g.selectAll('.country-label').each(function() {
+            const id = d3.select(this).attr('data-id');
+            const feature = featuresMap.get(id);
+            if (feature) {
+                const c = path.centroid(feature);
+                if (!isNaN(c[0])) d3.select(this).attr('x', c[0]).attr('y', c[1]);
+            }
+        });
     }
 
     // Build reverse lookup: alpha-3 id → country (for tooltip)
@@ -750,10 +767,11 @@
                     tooltip.style.display = 'none';
                 });
 
-            // Build path map: alpha-3 id → SVG element
+            // Build path map and features map
             features.forEach(f => {
                 const el = document.getElementById(`c-${f.id}`);
                 if (el) pathMap.set(f.id, el);
+                featuresMap.set(f.id, f);
             });
 
             // Enable input once map is ready
@@ -795,7 +813,7 @@
         secondsLeft = TOTAL_SECONDS;
         gameActive = true;
         timerStarted = false;
-        listEl.innerHTML = '';
+        g.selectAll('.country-label').remove();
         scoreEl.textContent = '0';
         updateTimer();
         overlay.classList.add('hidden');
@@ -856,11 +874,19 @@
         const el = pathMap.get(country.id);
         if (el) el.classList.add('guessed');
 
-        // Add to sidebar
-        const item = document.createElement('div');
-        item.className = 'guessed-item';
-        item.textContent = country.name;
-        listEl.prepend(item);
+        // Add label on map
+        const feature = featuresMap.get(country.id);
+        if (feature) {
+            const c = path.centroid(feature);
+            if (!isNaN(c[0])) {
+                g.append('text')
+                    .attr('class', 'country-label')
+                    .attr('data-id', country.id)
+                    .attr('x', c[0])
+                    .attr('y', c[1])
+                    .text(country.name);
+            }
+        }
     }
 
     // ─── Events ──────────────────────────────────────────────────────────────────
