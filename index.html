@@ -578,6 +578,14 @@
                 if (!isNaN(c[0])) d3.select(this).attr('x', c[0]).attr('y', c[1]);
             }
         });
+        dotsG.selectAll('.hint-dot').each(function() {
+            const id = d3.select(this).attr('id').replace('dot-', '');
+            const feature = featuresMap.get(id);
+            if (feature) {
+                const c = path.centroid(feature);
+                if (!isNaN(c[0])) d3.select(this).attr('cx', c[0]).attr('cy', c[1]);
+            }
+        });
     }
 
     // id → country object (for tooltip); populated after GeoJSON loads
