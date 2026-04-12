@@ -560,18 +560,13 @@
     const inputEl = document.getElementById('country-input');
     const feedbackEl = document.getElementById('feedback');
     const listEl = document.getElementById('guessed-list');
-    const CONTINENT_ORDER = ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America', 'Other'];
+    const CONTINENT_ORDER = ['Africa', 'Asia', 'Europe', 'North America', 'North America (Caribbean)', 'Oceania', 'South America', 'Other'];
 
     function renderSidebar() {
-        // Group guessed countries by continent, sorted by name within each group
         const groups = {};
         CONTINENT_ORDER.forEach(c => { groups[c] = []; });
         COUNTRIES.forEach(c => {
-            if (guessed.has(c.id)) {
-                const key = c.continent || 'Other';
-                if (!groups[key]) groups[key] = [];
-                groups[key].push(c.name);
-            }
+            if (guessed.has(c.id)) groups[c.continent || 'Other'].push(c.name);
         });
 
         listEl.innerHTML = '';
@@ -783,7 +778,7 @@
             }
         });
         scoreEl.textContent = '0';
-        listEl.innerHTML = '';
+        renderSidebar();
         updateTimer();
         overlay.classList.add('hidden');
         resultsBar.classList.add('hidden');
