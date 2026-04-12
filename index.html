@@ -247,7 +247,13 @@
 
         /* ── Sidebar ── */
         #sidebar {
-            display: none;
+            width: 200px;
+            min-width: 200px;
+            background: #161b27;
+            border-left: 1px solid #252d40;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         #sidebar-header {
@@ -279,8 +285,21 @@
             border-radius: 2px;
         }
 
+        .continent-group {
+            margin-bottom: 4px;
+        }
+
+        .continent-heading {
+            padding: 6px 10px 3px;
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .09em;
+            color: #5a7aaa;
+            font-weight: 700;
+        }
+
         .guessed-item {
-            padding: 5px 10px;
+            padding: 3px 10px;
             font-size: .82rem;
             border-radius: 6px;
             color: #c0e8d0;
@@ -293,7 +312,7 @@
         @keyframes slide-in {
             from {
                 opacity: 0;
-                transform: translateX(-10px);
+                transform: translateX(10px);
             }
             to {
                 opacity: 1;
@@ -306,6 +325,7 @@
             color: #6ee7b7;
             font-weight: 700;
             font-size: .75rem;
+            flex-shrink: 0;
         }
 
         .guessed-item:hover {
@@ -540,6 +560,40 @@
     const inputEl = document.getElementById('country-input');
     const feedbackEl = document.getElementById('feedback');
     const listEl = document.getElementById('guessed-list');
+    const CONTINENT_ORDER = ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America', 'Other'];
+
+    function renderSidebar() {
+        // Group guessed countries by continent, sorted by name within each group
+        const groups = {};
+        CONTINENT_ORDER.forEach(c => { groups[c] = []; });
+        COUNTRIES.forEach(c => {
+            if (guessed.has(c.id)) {
+                const key = c.continent || 'Other';
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(c.name);
+            }
+        });
+
+        listEl.innerHTML = '';
+        CONTINENT_ORDER.forEach(continent => {
+            const names = groups[continent];
+            if (!names || names.length === 0) return;
+            names.sort((a, b) => a.localeCompare(b));
+            const group = document.createElement('div');
+            group.className = 'continent-group';
+            const heading = document.createElement('div');
+            heading.className = 'continent-heading';
+            heading.textContent = continent;
+            group.appendChild(heading);
+            names.forEach(name => {
+                const item = document.createElement('div');
+                item.className = 'guessed-item';
+                item.textContent = name;
+                group.appendChild(item);
+            });
+            listEl.appendChild(group);
+        });
+    }
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.querySelector('#overlay-box #overlay-title');
     const overlaySubtitle = document.querySelector('#overlay-box #overlay-subtitle');
@@ -606,7 +660,7 @@
             // Build COUNTRIES and lookups from GeoJSON properties
             world.features.forEach(f => {
                 if (!f.properties.game_name) return;
-                const c = {id: f.id, name: f.properties.game_name, alts: f.properties.alts || []};
+                const c = {id: f.id, name: f.properties.game_name, alts: f.properties.alts || [], continent: f.properties.continent || 'Other'};
                 COUNTRIES.push(c);
                 lookup.set(norm(c.name), c);
                 c.alts.forEach(alt => lookup.set(norm(alt), c));
@@ -729,6 +783,7 @@
             }
         });
         scoreEl.textContent = '0';
+        listEl.innerHTML = '';
         updateTimer();
         overlay.classList.add('hidden');
         resultsBar.classList.add('hidden');
@@ -805,6 +860,8 @@
         setFeedback(`✓ ${country.name}`, 'fb-ok');
         inputEl.classList.add('correct');
         setTimeout(() => inputEl.classList.remove('correct'), 500);
+
+        renderSidebar();
 
         // Highlight on map and remove hint dot
         const el = pathMap.get(country.id);

@@ -24,11 +24,14 @@ for path in sorted(Path('countries').glob('*.geo.json')):
         rows.append({
             'id': feature.get('id', path.name.replace('.geo.json', '')),
             'game_name': feature['properties'].get('game_name', ''),
+            'continent': feature['properties'].get('continent', ''),
             'alts': '|'.join(alts),
         })
 
+rows.sort(key=lambda r: (r['continent'], r['id']))
+
 with open(args.out, 'w', newline='', encoding='utf-8') as f:
-    writer = csv.DictWriter(f, fieldnames=['id', 'game_name', 'alts'])
+    writer = csv.DictWriter(f, fieldnames=['id', 'continent', 'game_name', 'alts'])
     writer.writeheader()
     writer.writerows(rows)
 
