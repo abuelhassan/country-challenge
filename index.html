@@ -234,6 +234,16 @@
             fill: #4abf93;
         }
 
+        .country-path.latest {
+            fill: #1f7a52;
+            stroke: #3dffaa;
+            stroke-width: .8px;
+        }
+
+        .country-path.latest:hover {
+            fill: #267a57;
+        }
+
         .country-path.missed {
             fill: #9e3a3a;
             stroke: #e77;
@@ -456,7 +466,6 @@
         }
 
         .country-label {
-            font-size: 7px;
             fill: #e8f4e8;
             stroke: #0a1020;
             stroke-width: 2.5px;
@@ -551,6 +560,7 @@
     let guessed = new Set(); // ids of guessed countries
     let gameActive = false;
     let timerStarted = false;
+    let lastGuessedId = null;
     let pathMap = new Map();     // alpha-3 id → SVG path element
     let featuresMap = new Map(); // alpha-3 id → GeoJSON feature
 
@@ -609,6 +619,10 @@
     const projection = d3.geoNaturalEarth1().rotate([-16, 0]);
     const path = d3.geoPath().projection(projection);
 
+    function labelFontSize() {
+        return Math.max(6, projection.scale() * 0.03);
+    }
+
     // Zoom behaviour
     const zoom = d3.zoom()
         .scaleExtent([1, 12])
@@ -632,7 +646,7 @@
             const feature = featuresMap.get(id);
             if (feature) {
                 const c = projection(d3.geoCentroid(feature)) || [NaN, NaN];
-                if (!isNaN(c[0])) d3.select(this).attr('x', c[0]).attr('y', c[1]);
+                if (!isNaN(c[0])) d3.select(this).attr('x', c[0]).attr('y', c[1]).attr('font-size', labelFontSize());
             }
         });
         dotsG.selectAll('.hint-dot').each(function() {
@@ -760,6 +774,7 @@
         clearInterval(timerInterval);
         timerInterval = null;
         guessed.clear();
+        lastGuessedId = null;
         secondsLeft = TOTAL_SECONDS;
         gameActive = true;
         timerStarted = false;
@@ -785,7 +800,7 @@
         inputEl.style.display = '';
         feedbackEl.style.display = '';
         // Reset all highlighted countries
-        pathMap.forEach(el => el.classList.remove('guessed', 'missed'));
+        pathMap.forEach(el => el.classList.remove('guessed', 'missed', 'latest'));
         inputEl.disabled = false;
         inputEl.focus();
     }
@@ -795,7 +810,11 @@
         gameActive = false;
         inputEl.disabled = true;
 
-        // Mark missed countries in red
+        if (lastGuessedId) {
+            const el = pathMap.get(lastGuessedId);
+            if (el) el.classList.remove('latest');
+        }
+
         COUNTRIES.forEach(country => {
             if (guessed.has(country.id)) return;
             const el = pathMap.get(country.id);
@@ -807,6 +826,7 @@
                     g.append('text')
                         .attr('class', 'country-label missed')
                         .attr('data-id', country.id)
+                        .attr('font-size', labelFontSize())
                         .attr('x', c[0])
                         .attr('y', c[1])
                         .text(country.name);
@@ -858,25 +878,17 @@
 
         renderSidebar();
 
+        // Demote previous latest country
+        if (lastGuessedId) {
+            const prev = pathMap.get(lastGuessedId);
+            if (prev) prev.classList.remove('latest');
+        }
         // Highlight on map and remove hint dot
         const el = pathMap.get(country.id);
-        if (el) el.classList.add('guessed');
+        if (el) { el.classList.add('guessed'); el.classList.add('latest'); }
         const dot = document.getElementById(`dot-${country.id}`);
         if (dot) dot.remove();
-
-        // Add label on map
-        const feature = featuresMap.get(country.id);
-        if (feature) {
-            const c = projection(d3.geoCentroid(feature)) || [NaN, NaN];
-            if (!isNaN(c[0])) {
-                g.append('text')
-                    .attr('class', 'country-label')
-                    .attr('data-id', country.id)
-                    .attr('x', c[0])
-                    .attr('y', c[1])
-                    .text(country.name);
-            }
-        }
+        lastGuessedId = country.id;
 
         // Check if all countries have been guessed
         if (guessed.size === COUNTRIES.length) {
