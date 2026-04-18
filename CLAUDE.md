@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Details
 
 - **Security & Anti-Cheat:** Country names MUST NOT appear in `index.html`.
