@@ -497,6 +497,90 @@
             pointer-events: none;
             z-index: 9999;
         }
+
+        /* ── Country Spotlight ── */
+        #spotlight-card {
+            position: absolute;
+            width: 260px;
+            background: rgba(13, 18, 30, 0.94);
+            backdrop-filter: blur(6px);
+            border: 1px solid #253048;
+            border-left: 3px solid #7eb8f7;
+            border-radius: 10px;
+            padding: 13px 15px;
+            box-shadow: 0 10px 32px rgba(0, 0, 0, .65);
+            z-index: 10;
+            animation: spotlight-in .3s ease;
+        }
+
+        #spotlight-card.hidden { display: none; }
+
+        @keyframes spotlight-in {
+            from { opacity: 0; transform: scale(.94); }
+            to { opacity: 1; transform: none; }
+        }
+
+        .spotlight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 7px;
+        }
+
+        .spotlight-label {
+            font-size: .62rem;
+            text-transform: uppercase;
+            letter-spacing: .13em;
+            color: #7eb8f7;
+            font-weight: 700;
+        }
+
+        .spotlight-close {
+            background: none;
+            border: none;
+            color: #344260;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0;
+            line-height: 1;
+            transition: color .15s;
+        }
+
+        .spotlight-close:hover { color: #e8eaf0; }
+
+        .spotlight-country-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #e8eaf0;
+            margin-bottom: 10px;
+            line-height: 1.2;
+        }
+
+        .spotlight-facts {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .spotlight-facts li {
+            font-size: .79rem;
+            color: #7a96b8;
+            line-height: 1.45;
+            padding-left: 13px;
+            position: relative;
+        }
+
+        .spotlight-facts li::before {
+            content: '—';
+            position: absolute;
+            left: 0;
+            color: #2e4468;
+            font-size: .75em;
+            top: .18em;
+        }
     </style>
 </head>
 <body>
@@ -536,7 +620,16 @@
 
 <!-- Main -->
 <div id="main">
-    <div id="map-container"></div>
+    <div id="map-container">
+        <div id="spotlight-card" class="hidden">
+            <div class="spotlight-header">
+                <span class="spotlight-label">Did you know?</span>
+                <button class="spotlight-close" id="spotlight-close-btn">×</button>
+            </div>
+            <div id="spotlight-country" class="spotlight-country-name"></div>
+            <ul id="spotlight-facts" class="spotlight-facts"></ul>
+        </div>
+    </div>
     <div id="sidebar">
         <div id="sidebar-header">Guessed Countries</div>
         <div id="guessed-list"></div>
@@ -552,6 +645,8 @@
     function norm(s) {
         return s.toLowerCase().trim().replace(/['']/g, "'");
     }
+
+    // ─── Spotlight state ─────────────────────────────────────────────────────────
 
     // ─── Game state ─────────────────────────────────────────────────────────────
     const TOTAL_SECONDS = 15 * 60;
@@ -797,6 +892,7 @@
         updateTimer();
         overlay.classList.add('hidden');
         resultsBar.classList.add('hidden');
+        document.getElementById('spotlight-card').classList.add('hidden');
         inputEl.style.display = '';
         feedbackEl.style.display = '';
         // Reset all highlighted countries
@@ -839,6 +935,7 @@
         feedbackEl.style.display = 'none';
         resultsText.innerHTML = `Time's up! You named <strong>${guessed.size}</strong> / ${COUNTRIES.length} countries.`;
         resultsBar.classList.remove('hidden');
+        showSpotlight();
     }
 
     function setFeedback(msg, cls) {
@@ -901,6 +998,7 @@
             resultsText.innerHTML = `You got all <strong>${COUNTRIES.length}</strong> countries!`;
             resultsBar.classList.remove('hidden');
             launchConfetti();
+            showSpotlight();
         }
     }
 
@@ -929,6 +1027,63 @@
         overlayScoreLabel.style.display = 'none';
         overlayBtn.textContent = 'Start Game';
         overlayBtn.disabled = false;
+    });
+
+    // ─── Country Spotlight ───────────────────────────────────────────────────────
+    function hasFacts(country) {
+        return !!featuresMap.get(country.id)?.properties?.facts;
+    }
+
+    function showSpotlight() {
+        const missed = COUNTRIES.filter(c => !guessed.has(c.id) && hasFacts(c));
+        let pick;
+        if (missed.length > 0) {
+            pick = missed[Math.floor(Math.random() * missed.length)];
+        } else {
+            const withFacts = COUNTRIES.filter(c => hasFacts(c));
+            if (withFacts.length === 0) return;
+            pick = withFacts[Math.floor(Math.random() * withFacts.length)];
+        }
+        renderSpotlightCard(pick);
+        positionSpotlightCard(pick);
+        document.getElementById('spotlight-card').classList.remove('hidden');
+    }
+
+    function positionSpotlightCard(country) {
+        const feature = featuresMap.get(country.id);
+        if (!feature) return;
+        const [cx, cy] = projection(d3.geoCentroid(feature));
+        const t = d3.zoomTransform(svg.node());
+        const [sx, sy] = t.apply([cx, cy]);
+
+        const card = document.getElementById('spotlight-card');
+        const W = 260, H = 185, pad = 12;
+        const cw = container.clientWidth, ch = container.clientHeight;
+
+        let left = sx + 18;
+        let top = sy - H / 2;
+        if (left + W > cw - pad) left = sx - W - 18;
+        left = Math.max(pad, Math.min(left, cw - W - pad));
+        top = Math.max(pad, Math.min(top, ch - H - pad));
+
+        card.style.left = left + 'px';
+        card.style.top = top + 'px';
+    }
+
+    function renderSpotlightCard(country) {
+        const facts = featuresMap.get(country.id).properties.facts;
+        document.getElementById('spotlight-country').textContent = country.name;
+        const ul = document.getElementById('spotlight-facts');
+        ul.innerHTML = '';
+        facts.forEach(f => {
+            const li = document.createElement('li');
+            li.textContent = f;
+            ul.appendChild(li);
+        });
+    }
+
+    document.getElementById('spotlight-close-btn').addEventListener('click', () => {
+        document.getElementById('spotlight-card').classList.add('hidden');
     });
 
     // ─── Confetti ────────────────────────────────────────────────────────────────
