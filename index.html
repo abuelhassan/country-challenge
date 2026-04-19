@@ -500,7 +500,7 @@
 
         /* ── Country Spotlight ── */
         #spotlight-card {
-            position: absolute;
+            position: fixed;
             width: 260px;
             background: rgba(13, 18, 30, 0.94);
             backdrop-filter: blur(6px);
@@ -620,20 +620,20 @@
 
 <!-- Main -->
 <div id="main">
-    <div id="map-container">
-        <div id="spotlight-card" class="hidden">
-            <div class="spotlight-header">
-                <span class="spotlight-label">Did you know?</span>
-                <button class="spotlight-close" id="spotlight-close-btn">×</button>
-            </div>
-            <div id="spotlight-country" class="spotlight-country-name"></div>
-            <ul id="spotlight-facts" class="spotlight-facts"></ul>
-        </div>
-    </div>
+    <div id="map-container"></div>
     <div id="sidebar">
         <div id="sidebar-header">Guessed Countries</div>
         <div id="guessed-list"></div>
     </div>
+</div>
+
+<div id="spotlight-card" class="hidden">
+    <div class="spotlight-header">
+        <span class="spotlight-label">Did you know?</span>
+        <button class="spotlight-close" id="spotlight-close-btn">×</button>
+    </div>
+    <div id="spotlight-country" class="spotlight-country-name"></div>
+    <ul id="spotlight-facts" class="spotlight-facts"></ul>
 </div>
 
 <script>
@@ -1019,16 +1019,6 @@
         resetGame();
     });
 
-    startBtn.addEventListener('click', () => {
-        overlay.classList.remove('hidden');
-        overlayTitle.textContent = 'Country Challenge';
-        overlaySubtitle.innerHTML = `You have <strong>15 minutes</strong> to name as many countries as possible.<br>Type a country name and press <strong>Enter</strong>.`;
-        overlayScore.style.display = 'none';
-        overlayScoreLabel.style.display = 'none';
-        overlayBtn.textContent = 'Start Game';
-        overlayBtn.disabled = false;
-    });
-
     // ─── Country Spotlight ───────────────────────────────────────────────────────
     function hasFacts(country) {
         return !!featuresMap.get(country.id)?.properties?.facts;
@@ -1056,15 +1046,16 @@
         const t = d3.zoomTransform(svg.node());
         const [sx, sy] = t.apply([cx, cy]);
 
+        const rect = container.getBoundingClientRect();
         const card = document.getElementById('spotlight-card');
         const W = 260, H = 185, pad = 12;
-        const cw = container.clientWidth, ch = container.clientHeight;
+        const vpW = window.innerWidth, vpH = window.innerHeight;
 
-        let left = sx + 18;
-        let top = sy - H / 2;
-        if (left + W > cw - pad) left = sx - W - 18;
-        left = Math.max(pad, Math.min(left, cw - W - pad));
-        top = Math.max(pad, Math.min(top, ch - H - pad));
+        let left = rect.left + sx + 18;
+        let top = rect.top + sy - H / 2;
+        if (left + W > vpW - pad) left = rect.left + sx - W - 18;
+        left = Math.max(pad, Math.min(left, vpW - W - pad));
+        top = Math.max(pad, Math.min(top, vpH - H - pad));
 
         card.style.left = left + 'px';
         card.style.top = top + 'px';
