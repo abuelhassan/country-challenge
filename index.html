@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Country Challenge — 15 Minutes</title>
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="assets/proximity-scoring.js"></script>
     <style>
         *, *::before, *::after {
             box-sizing: border-box;
@@ -80,7 +81,7 @@
             padding: 6px 14px;
         }
 
-        #score-label {
+        .score-label {
             font-size: .75rem;
             color: #8090b0;
             text-transform: uppercase;
@@ -275,6 +276,43 @@
             border-bottom: 1px solid #252d40;
             flex-shrink: 0;
         }
+
+        #proximity-panel {
+            padding: 12px 14px;
+            border-bottom: 1px solid #252d40;
+            flex-shrink: 0;
+        }
+
+        #proximity-label {
+            font-size: .72rem;
+            color: #c0d4f0;
+        }
+
+        #proximity-score {
+            display: block;
+            margin: 3px 0;
+            font-size: 1.6rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: #f4c150;
+        }
+
+        #proximity-panel small, #proximity-panel details {
+            font-size: .72rem;
+            color: #8090b0;
+            line-height: 1.5;
+        }
+
+        #proximity-detail {
+            margin: 8px 0;
+            font-size: .75rem;
+            line-height: 1.45;
+            color: #c0d4f0;
+            overflow-wrap: anywhere;
+        }
+
+        #proximity-panel summary { cursor: pointer; }
+        #proximity-panel details p { margin-top: 6px; }
 
         #guessed-list {
             overflow-y: auto;
@@ -639,9 +677,9 @@
         <button id="play-again-btn">Play Again</button>
     </div>
     <div id="score-box">
-        <span id="score-label">Score</span>
+        <span class="score-label">Countries</span>
         <span id="score">0</span>
-        <span id="score-label">/ <span id="total-countries"></span></span>
+        <span class="score-label">/ <span id="total-countries"></span></span>
     </div>
 </div>
 
@@ -649,6 +687,17 @@
 <div id="main">
     <div id="map-container"></div>
     <div id="sidebar">
+        <div id="proximity-panel">
+            <div id="proximity-label">Proximity penalty</div>
+            <output id="proximity-score" aria-labelledby="proximity-label">0.0</output>
+            <small>Lower is better</small>
+            <p id="proximity-detail" aria-live="polite">Your first country adds no penalty.</p>
+            <details>
+                <summary>How penalties work</summary>
+                <p>A neighbor of any country you already named is free. Otherwise, add the distance from your last correct country in km ÷ 100.</p>
+                <p>Each island country is linked to its closest mainland country; that link is free in either direction. Distances follow the borders and coastlines on this map and are approximate.</p>
+            </details>
+        </div>
         <div id="sidebar-header">Guessed Countries</div>
         <div id="guessed-list"></div>
     </div>
@@ -689,12 +738,16 @@
     let gameActive = false;
     let timerStarted = false;
     let lastGuessedId = null;
+    let proximityScorer = null;
+    let gameReady = false;
     let pathMap = new Map();     // alpha-3 id → SVG path element
     let featuresMap = new Map(); // alpha-3 id → GeoJSON feature
 
     // ─── DOM refs ────────────────────────────────────────────────────────────────
     const timerEl = document.getElementById('timer');
     const scoreEl = document.getElementById('score');
+    const proximityScoreEl = document.getElementById('proximity-score');
+    const proximityDetailEl = document.getElementById('proximity-detail');
     const inputEl = document.getElementById('country-input');
     const feedbackEl = document.getElementById('feedback');
     const listEl = document.getElementById('guessed-list');
@@ -804,10 +857,15 @@
     // id → country object (for tooltip); populated after GeoJSON loads
     const idLookup = new Map();
 
-    // Load world GeoJSON
-    fetch('countries_merged.geojson')
-        .then(r => r.json())
-        .then(world => {
+    // Both files must be ready before guesses can be accepted.
+    Promise.all(['countries_merged.geojson', 'proximity.json'].map(url =>
+        fetch(url).then(response => {
+            if (!response.ok) throw new Error(`Failed to load ${url}`);
+            return response.json();
+        })
+    ))
+        .then(([world, scoringData]) => {
+            proximityScorer = new ProximityScorer(scoringData, world.features.filter(f => f.properties.game_name).map(f => f.id));
             // Build COUNTRIES and lookups from GeoJSON properties
             world.features.forEach(f => {
                 if (!f.properties.game_name) return;
@@ -882,12 +940,18 @@
             });
 
             // Enable input once map is ready
+            gameReady = true;
             gameActive = true;
             inputEl.disabled = false;
             inputEl.focus();
         })
         .catch(() => {
-            overlaySubtitle.textContent = 'Failed to load map. Check your internet connection and refresh.';
+            gameActive = false;
+            inputEl.disabled = true;
+            overlayTitle.textContent = 'Unable to load game';
+            overlaySubtitle.textContent = 'The map or scoring data could not be loaded. Please retry.';
+            overlayBtn.textContent = 'Retry';
+            overlay.classList.remove('hidden');
         });
 
     let resizeTimer;
@@ -913,10 +977,32 @@
     }
 
     // ─── Game logic ──────────────────────────────────────────────────────────────
+    function formatPenalty(value) {
+        return value.toLocaleString('en', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+    }
+
+    function renderProximity(result) {
+        proximityScoreEl.textContent = formatPenalty(proximityScorer.total);
+        if (!result) {
+            proximityDetailEl.textContent = 'Your first country adds no penalty.';
+        } else if (result.kind === 'first') {
+            proximityDetailEl.textContent = '+0.0 · First country';
+        } else if (result.kind === 'border') {
+            proximityDetailEl.textContent = `+0.0 · Borders ${idLookup.get(result.neighborId).name}`;
+        } else if (result.kind === 'island') {
+            proximityDetailEl.textContent = `+0.0 · Closest-land link with ${idLookup.get(result.neighborId).name}`;
+        } else {
+            const km = Math.round(result.distanceKm).toLocaleString('en');
+            proximityDetailEl.textContent = `+${formatPenalty(result.penalty)} · About ${km} km from ${idLookup.get(result.fromId).name}`;
+        }
+    }
+
     function resetGame() {
         clearInterval(timerInterval);
         timerInterval = null;
         guessed.clear();
+        proximityScorer.reset();
+        renderProximity();
         lastGuessedId = null;
         secondsLeft = TOTAL_SECONDS;
         gameActive = true;
@@ -947,6 +1033,9 @@
         pathMap.forEach(el => el.classList.remove('guessed', 'missed', 'latest'));
         inputEl.disabled = false;
         inputEl.value = '';
+        clearTimeout(feedbackEl._t);
+        feedbackEl.textContent = '';
+        feedbackEl.className = '';
         inputEl.focus();
     }
 
@@ -982,7 +1071,7 @@
         dotsG.selectAll('.hint-dot').remove();
         inputEl.style.display = 'none';
         feedbackEl.style.display = 'none';
-        resultsText.innerHTML = `Time's up! You named <strong>${guessed.size}</strong> / ${COUNTRIES.length} countries.`;
+        resultsText.innerHTML = `Time's up! <strong>${guessed.size}</strong> / ${COUNTRIES.length} countries. Proximity penalty: <strong>${formatPenalty(proximityScorer.total)}</strong>.`;
         resultsBar.classList.remove('hidden');
         showSpotlight();
     }
@@ -998,6 +1087,7 @@
     }
 
     function guess(raw) {
+        if (!gameActive || !proximityScorer) return false;
         const key = norm(raw);
         if (!key) return false;
         const country = lookup.get(key);
@@ -1016,7 +1106,9 @@
             timerStarted = true;
             startTimer();
         }
+        const proximityResult = proximityScorer.record(country.id);
         guessed.add(country.id);
+        renderProximity(proximityResult);
         scoreEl.textContent = guessed.size;
         setFeedback(`✓ ${country.name}`, 'fb-ok');
         inputEl.classList.add('correct');
@@ -1044,7 +1136,7 @@
             inputEl.style.display = 'none';
             feedbackEl.style.display = 'none';
             dotsG.selectAll('.hint-dot').remove();
-            resultsText.innerHTML = `You got all <strong>${COUNTRIES.length}</strong> countries!`;
+            resultsText.innerHTML = `All <strong>${COUNTRIES.length}</strong> countries! Proximity penalty: <strong>${formatPenalty(proximityScorer.total)}</strong>.`;
             resultsBar.classList.remove('hidden');
             launchConfetti();
             showSpotlight();
@@ -1064,6 +1156,10 @@
     playAgainBtn.addEventListener('click', () => resetGame());
 
     overlayBtn.addEventListener('click', () => {
+        if (!gameReady) {
+            window.location.reload();
+            return;
+        }
         overlayBtn.disabled = true;
         resetGame();
     });
