@@ -1089,6 +1089,7 @@
         }, 1500);
     }
 
+    // Return true for recognized answers so the input can be cleared, including duplicates.
     function guess(raw) {
         if (!gameActive || !proximityScorer) return false;
         const key = norm(raw);
@@ -1102,7 +1103,7 @@
         }
         if (guessed.has(country.id)) {
             setFeedback('Already got it!', 'fb-dup');
-            return false;
+            return true;
         }
         // Correct!
         if (!timerStarted) {
