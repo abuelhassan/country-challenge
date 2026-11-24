@@ -54,17 +54,8 @@ Remaining user experience and feature ideas, ordered roughly by priority.
 - Let players browse country facts during post-game review.
 - Include sources and review dates for facts that can change over time.
 
-## Future island handling
-
-- Improve island adjacency by considering both nearby land areas and nearby islands, rather than connecting each island only to its closest land.
-
 ## Other scoring variations
 
 - **Continent completion bonuses:** Award extra points whenever a player names every country in a continent.
 - **Area-based scoring:** Score players by the total land area of the countries they name correctly, and show the share of the game's total land area they have covered.
 - **Surprise bonuses:** Award unexpected extra points for special milestones or answer patterns, such as starting with Egypt, finishing with Vanuatu, or naming every island country. Reveal the reason for each bonus so players can enjoy discovering these achievements.
-
-## Implemented
-
-- **Bering Strait connection:** The USA and Russia count as neighbors for proximity scoring, providing a free connection between the Americas and Eurasia in both directions. This also applies when the counterpart was an earlier guess rather than the last one.
-- **Proximity penalty:** Starts at zero. The first correct country and neighbors of any previous correct answer are free. Otherwise, add the approximate border/coastline distance from the last correct answer in kilometers divided by 100. Each island country has one precalculated closest-mainland connection, free in both directions. Invalid and duplicate guesses do not affect the penalty or the last successful guess; replay resets both. Country count and proximity penalty are displayed separately. The broader island-handling idea above remains unimplemented.
