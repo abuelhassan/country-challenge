@@ -81,45 +81,25 @@ function build(world, config) {
     const features = world.features.filter(f => f.properties.game_name);
     const ids = features.map(f => f.id);
     if (new Set(ids).size !== ids.length) throw new Error('Duplicate country IDs');
-    const index = new Map(ids.map((id, i) => [id, i]));
-    const islands = new Set(config.islandCountries.map(hashId));
-    const explicitBorders = new Set([...config.islandBorders, ...config.additionalMainlandBorders].map(([a, b]) => pairKey(hashId(a), hashId(b))));
-    for (const iso of [...config.islandCountries, ...config.islandBorders.flat(), ...config.additionalMainlandBorders.flat(), ...(config.crossingLinks || []).flatMap(link => link.countries)]) {
-        if (!index.has(hashId(iso))) throw new Error(`Unknown country in configuration: ${iso}`);
+    if (!Array.isArray(config.landBorderCorrections)) throw new Error('Invalid land border corrections');
+    const known = new Set(ids);
+    const explicitBorders = new Set();
+    for (const pair of config.landBorderCorrections) {
+        if (!Array.isArray(pair) || pair.length !== 2 || pair[0] === pair[1] ||
+            pair.some(iso => typeof iso !== 'string' || !known.has(hashId(iso)))) {
+            throw new Error('Invalid land border correction');
+        }
+        explicitBorders.add(pairKey(...pair.map(hashId)));
     }
     const shapes = features.map(f => geometryShape(f.geometry));
     const distancesKm = ids.map(() => ids.map(() => 0));
-    const landNeighbors = ids.map(() => []);
     for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
-            const explicit = explicitBorders.has(pairKey(ids[i], ids[j]));
-            const km = explicit ? 0 : boundaryDistance(shapes[i], shapes[j]);
-            const border = explicit || (!islands.has(ids[i]) && !islands.has(ids[j]) && km < 0.1);
+            const km = explicitBorders.has(pairKey(ids[i], ids[j])) ? 0 : boundaryDistance(shapes[i], shapes[j]);
             distancesKm[i][j] = distancesKm[j][i] = Math.round(km * 1000) / 1000;
-            if (border) { landNeighbors[i].push(ids[j]); landNeighbors[j].push(ids[i]); }
         }
     }
-    const islandLinks = [];
-    for (let i = 0; i < ids.length; i++) {
-        if (!islands.has(ids[i])) continue;
-        let closest = -1;
-        for (let j = 0; j < ids.length; j++) {
-            if (islands.has(ids[j])) continue;
-            if (closest === -1 || distancesKm[i][j] < distancesKm[i][closest]) closest = j;
-        }
-        if (closest === -1) throw new Error('No mainland candidate');
-        islandLinks.push({island: ids[i], mainland: ids[closest], distanceKm: distancesKm[i][closest]});
-    }
-    // Free gameplay crossings keep their real map distance and remain distinct
-    // from land borders and closest-mainland links.
-    const crossingLinks = (config.crossingLinks || []).map(({countries, label}) => {
-        if (countries.length !== 2 || countries[0] === countries[1] || typeof label !== 'string' || !label.trim()) {
-            throw new Error('Invalid crossing configuration');
-        }
-        const [a, b] = countries.map(hashId);
-        return {a, b, label, distanceKm: distancesKm[index.get(a)][index.get(b)]};
-    });
-    return {version: 1, ids, distancesKm, landNeighbors, islandLinks, crossingLinks};
+    return {version: 2, ids, distancesKm};
 }
 
 if (require.main === module) {
@@ -130,7 +110,7 @@ if (require.main === module) {
     data.sourceSha256 = crypto.createHash('sha256').update(source).digest('hex');
     data.configSha256 = crypto.createHash('sha256').update(configSource).digest('hex');
     fs.writeFileSync(path.join(root, 'proximity.json'), JSON.stringify(data) + '\n');
-    console.log(`Generated distances for ${data.ids.length} countries and ${data.islandLinks.length} island links.`);
+    console.log(`Generated distances for ${data.ids.length} countries.`);
 }
 
 module.exports = {vector, geometryShape, boundaryDistance, build, hashId};

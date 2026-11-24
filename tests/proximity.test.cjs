@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 
 function fixture() {
     return new ProximityScorer({
-        version: 1,
+        version: 2,
         ids: ['a', 'b', 'c', 'd', 'island', 'island2'],
         distancesKm: [
             [0, 1000, 0, 100, 50, 60],
@@ -21,69 +21,84 @@ function fixture() {
             [50, 900, 250, 500, 0, 10],
             [60, 850, 260, 510, 10, 0],
         ],
-        landNeighbors: [['c'], [], ['a'], [], [], []],
-        islandLinks: [
-            {island: 'island', mainland: 'a', distanceKm: 50},
-            {island: 'island2', mainland: 'a', distanceKm: 60},
-        ],
     }, ['a', 'b', 'c', 'd', 'island', 'island2']);
 }
 
-test('first guess is free; distance uses last guess, not nearest previous country', () => {
+const mapDistance = (a, b) => data.distancesKm[data.ids.indexOf(hashId(a))][data.ids.indexOf(hashId(b))];
+
+test('the first correct country adds zero penalty', () => {
     const scorer = fixture();
-    assert.equal(scorer.record('a').penalty, 0);
+    const result = scorer.record('a');
+    assert.equal(result.kind, 'first');
+    assert.equal(result.neighborId, null);
+    assert.equal(result.distanceKm, 0);
+    assert.equal(result.penalty, 0);
+    assert.equal(result.total, 0);
+});
+
+test('penalty uses the closest previous guess rather than the last guess', () => {
+    const scorer = fixture();
+    scorer.record('a');
     assert.equal(scorer.record('b').penalty, 10);
     const result = scorer.record('d');
-    assert.equal(result.fromId, 'b');
+    assert.equal(result.neighborId, 'a');
+    assert.equal(result.distanceKm, 100);
+    assert.equal(result.penalty, 1);
+    assert.equal(result.total, 11);
+});
+
+test('unguessed countries cannot reduce the distance', () => {
+    const scorer = fixture();
+    scorer.record('b');
+    const result = scorer.record('d');
+    assert.equal(result.neighborId, 'b');
     assert.equal(result.distanceKm, 1500);
     assert.equal(result.penalty, 15);
-    assert.equal(result.total, 25);
 });
 
-test('any previous border is free and a free move becomes the next origin', () => {
+test('a touching earlier country naturally produces zero penalty', () => {
     const scorer = fixture();
     scorer.record('a');
     scorer.record('b');
-    const free = scorer.record('c');
-    assert.equal(free.kind, 'border');
-    assert.equal(free.neighborId, 'a');
-    assert.equal(free.total, 10);
-    assert.equal(scorer.record('d').penalty, 7);
-});
-
-test('island links are symmetric and can match any earlier guess', () => {
-    const scorer = fixture();
-    scorer.record('a');
-    scorer.record('b');
-    const result = scorer.record('island');
-    assert.equal(result.kind, 'island');
+    const result = scorer.record('c');
     assert.equal(result.neighborId, 'a');
+    assert.equal(result.distanceKm, 0);
     assert.equal(result.penalty, 0);
-    scorer.reset();
-    scorer.record('island');
-    assert.equal(scorer.record('a').penalty, 0);
+    assert.equal(result.total, 10);
 });
 
-test('nearby islands do not receive extra virtual neighbors', () => {
+test('a closer island is used even when a mainland country has been guessed', () => {
     const scorer = fixture();
-    scorer.record('island');
-    const result = scorer.record('island2');
-    assert.equal(result.kind, 'distance');
+    scorer.record('a');
+    assert.equal(scorer.record('island2').penalty, 0.6);
+    const result = scorer.record('island');
+    assert.equal(result.neighborId, 'island2');
+    assert.equal(result.distanceKm, 10);
     assert.equal(result.penalty, 0.1);
+    assert.equal(result.total, 0.7);
 });
 
-test('invalid and duplicate answers do not change the origin or score', () => {
+test('island and mainland pairs use the same distance formula in both directions', () => {
+    for (const [start, next, expected] of [['island', 'island2', 0.1], ['island', 'a', 0.5]]) {
+        for (const [a, b] of [[start, next], [next, start]]) {
+            const scorer = fixture();
+            scorer.record(a);
+            assert.equal(scorer.record(b).penalty, expected);
+        }
+    }
+});
+
+test('invalid and duplicate guesses do not change the score or candidate countries', () => {
     const scorer = fixture();
     scorer.record('a');
     scorer.record('b');
     assert.equal(scorer.record('unknown'), null);
     assert.equal(scorer.record('a'), null);
-    assert.equal(scorer.lastId, 'b');
     assert.equal(scorer.total, 10);
-    assert.equal(scorer.guessed.size, 2);
+    assert.deepEqual([...scorer.guessed], ['a', 'b']);
 });
 
-test('reset clears the score and origin; previous awards stay fixed', () => {
+test('reset clears the score and guesses; later answers do not alter earlier awards', () => {
     const scorer = fixture();
     scorer.record('b');
     const award = scorer.record('a');
@@ -92,22 +107,50 @@ test('reset clears the score and origin; previous awards stay fixed', () => {
     assert.equal(scorer.total, 10);
     scorer.reset();
     assert.equal(scorer.total, 0);
-    assert.equal(scorer.lastId, null);
     assert.equal(scorer.guessed.size, 0);
     assert.equal(scorer.record('d').kind, 'first');
 });
 
-test('scoring data must match the playable countries', () => {
-    assert.throws(() => new ProximityScorer(data, ['unknown']), /does not match/);
-    const invalid = structuredClone(data);
-    invalid.distancesKm[0][1] = null;
-    assert.throws(() => new ProximityScorer(invalid, data.ids), /Invalid proximity/);
+test('equal distances select the earliest guessed neighbor consistently', () => {
+    const tied = new ProximityScorer({version: 2, ids: ['a', 'b', 'c'], distancesKm: [[0, 20, 10], [20, 0, 10], [10, 10, 0]]}, ['a', 'b', 'c']);
+    tied.record('b');
+    tied.record('a');
+    assert.equal(tied.record('c').neighborId, 'b');
 });
 
-test('generated data matches the map and island configuration', () => {
+test('fractional penalties are accumulated without early rounding', () => {
+    const scorer = new ProximityScorer({version: 2, ids: ['a', 'b', 'c'], distancesKm: [[0, 12.345, 40], [12.345, 0, 23.456], [40, 23.456, 0]]}, ['a', 'b', 'c']);
+    scorer.record('a');
+    const first = scorer.record('b');
+    const second = scorer.record('c');
+    assert.equal(first.penalty, 12.345 / 100);
+    assert.equal(second.penalty, 23.456 / 100);
+    assert.equal(second.total, 12.345 / 100 + 23.456 / 100);
+});
+
+test('obsolete data and malformed distance matrices are rejected', () => {
+    assert.throws(() => new ProximityScorer(data, ['unknown']), /does not match/);
+    assert.throws(() => new ProximityScorer({...data, version: 1}, data.ids), /does not match/);
+    for (const change of [
+        d => { d.distancesKm = []; },
+        d => { d.distancesKm[0].pop(); },
+        d => { d.distancesKm[0][1] = null; },
+        d => { d.distancesKm[0][1] = -1; },
+        d => { d.distancesKm[0][1] = Infinity; },
+        d => { d.distancesKm[0][0] = 1; },
+        d => { d.distancesKm[0][1] += 1; },
+    ]) {
+        const invalid = structuredClone(data);
+        change(invalid);
+        assert.throws(() => new ProximityScorer(invalid, data.ids), /proximity data/);
+    }
+});
+
+test('generated distance-only data matches the map and geographic corrections', () => {
     const digest = file => crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex');
     assert.equal(data.sourceSha256, digest('countries_merged.geojson'));
     assert.equal(data.configSha256, digest('scripts/proximity-config.json'));
+    assert.deepEqual(Object.keys(data).sort(), ['configSha256', 'distancesKm', 'ids', 'sourceSha256', 'version']);
     const world = JSON.parse(fs.readFileSync(path.join(root, 'countries_merged.geojson'), 'utf8'));
     const ids = world.features.filter(f => f.properties.game_name).map(f => f.id);
     const scorer = new ProximityScorer(data, ids);
@@ -116,107 +159,44 @@ test('generated data matches the map and island configuration', () => {
         for (let j = 0; j < ids.length; j++) {
             assert.equal(data.distancesKm[i][j], data.distancesKm[j][i]);
             assert.ok(data.distancesKm[i][j] >= 0 && data.distancesKm[i][j] <= 20016);
-            assert.equal(data.landNeighbors[i].includes(ids[j]), data.landNeighbors[j].includes(ids[i]));
         }
         assert.ok(scorer.record(ids[i]));
     }
     assert.equal(scorer.guessed.size, 196);
     assert.ok(Number.isFinite(scorer.total));
+    for (const [a, b] of config.landBorderCorrections) assert.equal(mapDistance(a, b), 0);
 });
 
-test('every configured island has exactly one closest-mainland link', () => {
-    const islands = new Set(config.islandCountries.map(hashId));
-    assert.equal(data.islandLinks.length, islands.size);
-    assert.equal(new Set(data.islandLinks.map(l => l.island)).size, islands.size);
-    for (const link of data.islandLinks) {
-        assert.ok(islands.has(link.island));
-        assert.ok(!islands.has(link.mainland));
-        const row = data.distancesKm[data.ids.indexOf(link.island)];
-        const minimum = Math.min(...row.filter((_, i) => !islands.has(data.ids[i])));
-        assert.equal(link.distanceKm, minimum);
-        assert.equal(row[data.ids.indexOf(link.mainland)], minimum);
-    }
+test('real map: a previous island can be closer than the last guessed mainland country', () => {
+    const scorer = new ProximityScorer(data, data.ids);
+    scorer.record(hashId('FJI'));
+    assert.ok(scorer.record(hashId('AUS')).penalty > 0);
+    const result = scorer.record(hashId('TON'));
+    assert.equal(result.neighborId, hashId('FJI'));
+    assert.equal(result.penalty, mapDistance('FJI', 'TON') / 100);
+    assert.ok(result.penalty > 0);
+    assert.ok(result.distanceKm < mapDistance('AUS', 'TON'));
 });
 
-test('real map: older neighbor waives penalty after a distant guess', () => {
+test('real map: a previous shared border adds zero after a distant guess', () => {
     const scorer = new ProximityScorer(data, data.ids);
     scorer.record(hashId('EGY'));
-    assert.ok(scorer.record(hashId('JPN')).penalty > 0);
+    assert.ok(scorer.record(hashId('JPN')).penalty > 80);
     const result = scorer.record(hashId('LBY'));
-    assert.equal(result.kind, 'border');
     assert.equal(result.neighborId, hashId('EGY'));
+    assert.equal(result.distanceKm, 0);
     assert.equal(result.penalty, 0);
 });
 
-test('long jumps are not capped and fractional penalties are retained', () => {
-    const scorer = new ProximityScorer(data, data.ids);
-    scorer.record(hashId('EGY'));
-    const result = scorer.record(hashId('JPN'));
-    assert.ok(result.penalty > 80);
-    assert.equal(result.penalty, result.distanceKm / 100);
-});
-
-test('Bering Strait crossing is free in both directions', () => {
-    for (const [start, next] of [['USA', 'RUS'], ['RUS', 'USA']]) {
+test('Bering Strait follows the distance formula in both directions', () => {
+    for (const [a, b] of [['USA', 'RUS'], ['RUS', 'USA']]) {
         const scorer = new ProximityScorer(data, data.ids);
-        scorer.record(hashId(start));
-        const result = scorer.record(hashId(next));
-        assert.equal(result.kind, 'crossing');
-        assert.equal(result.neighborId, hashId(start));
-        assert.equal(result.connectionLabel, 'Bering Strait');
-        assert.equal(result.penalty, 0);
-        assert.equal(result.total, 0);
-        assert.equal(scorer.lastId, hashId(next));
+        scorer.record(hashId(a));
+        const result = scorer.record(hashId(b));
+        assert.equal(result.neighborId, hashId(a));
+        assert.equal(result.penalty, mapDistance(a, b) / 100);
+        assert.ok(result.penalty > 0);
     }
-});
-
-test('Bering Strait connection recognizes earlier guesses without refunding penalties', () => {
-    for (const [start, next] of [['USA', 'RUS'], ['RUS', 'USA']]) {
-        const scorer = new ProximityScorer(data, data.ids);
-        scorer.record(hashId(start));
-        const previous = scorer.record(hashId('BRA'));
-        assert.ok(previous.penalty > 0);
-        const result = scorer.record(hashId(next));
-        assert.equal(result.kind, 'crossing');
-        assert.equal(result.neighborId, hashId(start));
-        assert.equal(result.total, previous.total);
-    }
-});
-
-test('the crossing supports free land-neighbor routes between continents', () => {
-    const route = ['CAN', 'USA', 'RUS', 'CHN'];
-    for (const order of [route, [...route].reverse()]) {
-        const scorer = new ProximityScorer(data, data.ids);
-        for (const iso of order) assert.equal(scorer.record(hashId(iso)).penalty, 0);
-        assert.equal(scorer.total, 0);
-    }
-});
-
-test('other intercontinental jumps still add a penalty', () => {
-    const scorer = new ProximityScorer(data, data.ids);
-    scorer.record(hashId('USA'));
-    const result = scorer.record(hashId('FRA'));
-    assert.equal(result.kind, 'distance');
-    assert.ok(result.penalty > 0);
-});
-
-test('crossing data preserves the actual map distance and is not a land border', () => {
-    const a = hashId('USA'), b = hashId('RUS');
-    const i = data.ids.indexOf(a), j = data.ids.indexOf(b);
-    assert.equal(data.crossingLinks.length, 1);
-    const link = data.crossingLinks[0];
-    assert.deepEqual([link.a, link.b], [a, b]);
-    assert.equal(link.label, 'Bering Strait');
-    assert.equal(link.distanceKm, data.distancesKm[i][j]);
-    assert.ok(link.distanceKm > 0);
-    assert.ok(!data.landNeighbors[i].includes(b));
-    assert.ok(!data.landNeighbors[j].includes(a));
-});
-
-test('invalid crossing endpoints are rejected', () => {
-    const invalid = structuredClone(data);
-    invalid.crossingLinks[0].a = 'unknown';
-    assert.throws(() => new ProximityScorer(invalid, data.ids), /Invalid crossing link/);
 });
 
 const polygon = coordinates => geometryShape({type: 'Polygon', coordinates: [coordinates]});
