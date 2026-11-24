@@ -301,12 +301,39 @@
 
         .continent-heading {
             padding: 6px 10px 3px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
             font-size: .68rem;
             text-transform: uppercase;
             letter-spacing: .09em;
             color: #5a7aaa;
             font-weight: 700;
         }
+
+        .continent-count {
+            color: #c0e8d0;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: normal;
+        }
+
+        .continent-progress {
+            display: block;
+            width: calc(100% - 20px);
+            height: 5px;
+            margin: 0 10px 6px;
+            border: none;
+            border-radius: 3px;
+            overflow: hidden;
+            appearance: none;
+            background: #2e3a55;
+        }
+
+        .continent-progress::-webkit-progress-bar { background: #2e3a55; }
+        .continent-progress::-webkit-progress-value { background: #6ee7b7; }
+        .continent-progress::-moz-progress-bar { background: #6ee7b7; }
 
         .guessed-item {
             padding: 3px 10px;
@@ -671,26 +698,40 @@
     const inputEl = document.getElementById('country-input');
     const feedbackEl = document.getElementById('feedback');
     const listEl = document.getElementById('guessed-list');
-    const CONTINENT_ORDER = ['Africa', 'Asia', 'Europe', 'North America', 'North America (Caribbean)', 'Oceania', 'South America', 'Other'];
+    const CONTINENT_ORDER = ['Africa', 'Asia', 'Europe', 'North America', 'North America (Caribbean)', 'South America', 'Other', 'Oceania'];
 
     function renderSidebar() {
         const groups = {};
-        CONTINENT_ORDER.forEach(c => { groups[c] = []; });
+        CONTINENT_ORDER.forEach(c => { groups[c] = {names: [], total: 0}; });
         COUNTRIES.forEach(c => {
-            if (guessed.has(c.id)) groups[c.continent || 'Other'].push(c.name);
+            const group = groups[c.continent] || groups.Other;
+            group.total++;
+            if (guessed.has(c.id)) group.names.push(c.name);
         });
 
         listEl.innerHTML = '';
         CONTINENT_ORDER.forEach(continent => {
-            const names = groups[continent];
-            if (!names || names.length === 0) return;
+            const {names, total} = groups[continent];
+            if (total === 0) return;
             names.sort((a, b) => a.localeCompare(b));
             const group = document.createElement('div');
             group.className = 'continent-group';
             const heading = document.createElement('div');
             heading.className = 'continent-heading';
-            heading.textContent = continent;
+            const title = document.createElement('span');
+            title.textContent = continent;
+            const count = document.createElement('span');
+            count.className = 'continent-count';
+            count.textContent = `${names.length}/${total}`;
+            heading.appendChild(title);
+            heading.appendChild(count);
             group.appendChild(heading);
+            const progress = document.createElement('progress');
+            progress.className = 'continent-progress';
+            progress.max = total;
+            progress.value = names.length;
+            progress.setAttribute('aria-label', `${continent}: ${names.length} of ${total} countries guessed`);
+            group.appendChild(progress);
             names.forEach(name => {
                 const item = document.createElement('div');
                 item.className = 'guessed-item';
@@ -777,6 +818,7 @@
                 idLookup.set(c.id, c);
             });
             document.getElementById('total-countries').textContent = COUNTRIES.length;
+            renderSidebar();
 
             const w = container.clientWidth;
             const h = container.clientHeight;
