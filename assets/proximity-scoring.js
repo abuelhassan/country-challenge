@@ -26,6 +26,14 @@ class ProximityScorer {
             this.islandNeighbors.get(island).add(mainland);
             this.islandNeighbors.get(mainland).add(island);
         }
+        this.crossingNeighbors = new Map(data.ids.map(id => [id, new Map()]));
+        if (data.crossingLinks !== undefined && !Array.isArray(data.crossingLinks)) throw new Error('Invalid crossing links');
+        for (const {a, b, label, distanceKm} of data.crossingLinks || []) {
+            if (!known(a) || !known(b) || a === b || typeof label !== 'string' || !label.trim() ||
+                !Number.isFinite(distanceKm) || distanceKm < 0) throw new Error('Invalid crossing link');
+            this.crossingNeighbors.get(a).set(b, label);
+            this.crossingNeighbors.get(b).set(a, label);
+        }
         this.reset();
     }
 
@@ -41,10 +49,15 @@ class ProximityScorer {
         if (this.lastId !== null) {
             const previous = [...this.guessed];
             const border = previous.find(other => this.landNeighbors.get(id).has(other));
+            const crossing = previous.find(other => this.crossingNeighbors.get(id).has(other));
             const island = previous.find(other => this.islandNeighbors.get(id).has(other));
             if (border !== undefined) {
                 result.kind = 'border';
                 result.neighborId = border;
+            } else if (crossing !== undefined) {
+                result.kind = 'crossing';
+                result.neighborId = crossing;
+                result.connectionLabel = this.crossingNeighbors.get(id).get(crossing);
             } else if (island !== undefined) {
                 result.kind = 'island';
                 result.neighborId = island;

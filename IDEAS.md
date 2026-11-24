@@ -66,4 +66,5 @@ Remaining user experience and feature ideas, ordered roughly by priority.
 
 ## Implemented
 
+- **Bering Strait connection:** The USA and Russia count as neighbors for proximity scoring, providing a free connection between the Americas and Eurasia in both directions. This also applies when the counterpart was an earlier guess rather than the last one.
 - **Proximity penalty:** Starts at zero. The first correct country and neighbors of any previous correct answer are free. Otherwise, add the approximate border/coastline distance from the last correct answer in kilometers divided by 100. Each island country has one precalculated closest-mainland connection, free in both directions. Invalid and duplicate guesses do not affect the penalty or the last successful guess; replay resets both. Country count and proximity penalty are displayed separately. The broader island-handling idea above remains unimplemented.

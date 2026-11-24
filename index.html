@@ -696,6 +696,7 @@
                 <summary>How penalties work</summary>
                 <p>A neighbor of any country you already named is free. Otherwise, add the distance from your last correct country in km ÷ 100.</p>
                 <p>Each island country is linked to its closest mainland country; that link is free in either direction. Distances follow the borders and coastlines on this map and are approximate.</p>
+                <p>The two countries across the Bering Strait also count as neighbors, making that crossing free in either direction.</p>
             </details>
         </div>
         <div id="sidebar-header">Guessed Countries</div>
@@ -991,6 +992,8 @@
             proximityDetailEl.textContent = `+0.0 · Borders ${idLookup.get(result.neighborId).name}`;
         } else if (result.kind === 'island') {
             proximityDetailEl.textContent = `+0.0 · Closest-land link with ${idLookup.get(result.neighborId).name}`;
+        } else if (result.kind === 'crossing') {
+            proximityDetailEl.textContent = `+0.0 · ${result.connectionLabel} connection with ${idLookup.get(result.neighborId).name}`;
         } else {
             const km = Math.round(result.distanceKm).toLocaleString('en');
             proximityDetailEl.textContent = `+${formatPenalty(result.penalty)} · About ${km} km from ${idLookup.get(result.fromId).name}`;

@@ -2,5 +2,6 @@
   "description": "Countries wholly on islands receive one closest-mainland link. Australia is treated as mainland. Mainland candidates use all of their geometry represented in the game. Borders involving island countries are explicit to avoid false contacts caused by simplified coastlines.",
   "islandCountries": ["ATG", "BHS", "BHR", "BRB", "BRN", "CPV", "COM", "CUB", "CYP", "DMA", "DOM", "FJI", "GRD", "HTI", "ISL", "IDN", "IRL", "JAM", "JPN", "KIR", "MDG", "MDV", "MLT", "MHL", "MUS", "FSM", "NRU", "NZL", "PLW", "PNG", "PHL", "KNA", "LCA", "VCT", "WSM", "STP", "SYC", "SGP", "SLB", "LKA", "TWN", "TLS", "TON", "TTO", "TUV", "GBR", "VUT"],
   "islandBorders": [["BRN", "MYS"], ["DOM", "HTI"], ["GBR", "IRL"], ["IDN", "MYS"], ["IDN", "PNG"], ["IDN", "TLS"]],
-  "additionalMainlandBorders": [["AND", "ESP"], ["AND", "FRA"], ["LIE", "AUT"], ["LIE", "CHE"], ["MCO", "FRA"], ["SMR", "ITA"], ["VAT", "ITA"]]
+  "additionalMainlandBorders": [["AND", "ESP"], ["AND", "FRA"], ["LIE", "AUT"], ["LIE", "CHE"], ["MCO", "FRA"], ["SMR", "ITA"], ["VAT", "ITA"]],
+  "crossingLinks": [{"countries": ["USA", "RUS"], "label": "Bering Strait"}]
 }

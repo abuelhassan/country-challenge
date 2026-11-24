@@ -156,6 +156,69 @@ test('long jumps are not capped and fractional penalties are retained', () => {
     assert.equal(result.penalty, result.distanceKm / 100);
 });
 
+test('Bering Strait crossing is free in both directions', () => {
+    for (const [start, next] of [['USA', 'RUS'], ['RUS', 'USA']]) {
+        const scorer = new ProximityScorer(data, data.ids);
+        scorer.record(hashId(start));
+        const result = scorer.record(hashId(next));
+        assert.equal(result.kind, 'crossing');
+        assert.equal(result.neighborId, hashId(start));
+        assert.equal(result.connectionLabel, 'Bering Strait');
+        assert.equal(result.penalty, 0);
+        assert.equal(result.total, 0);
+        assert.equal(scorer.lastId, hashId(next));
+    }
+});
+
+test('Bering Strait connection recognizes earlier guesses without refunding penalties', () => {
+    for (const [start, next] of [['USA', 'RUS'], ['RUS', 'USA']]) {
+        const scorer = new ProximityScorer(data, data.ids);
+        scorer.record(hashId(start));
+        const previous = scorer.record(hashId('BRA'));
+        assert.ok(previous.penalty > 0);
+        const result = scorer.record(hashId(next));
+        assert.equal(result.kind, 'crossing');
+        assert.equal(result.neighborId, hashId(start));
+        assert.equal(result.total, previous.total);
+    }
+});
+
+test('the crossing supports free land-neighbor routes between continents', () => {
+    const route = ['CAN', 'USA', 'RUS', 'CHN'];
+    for (const order of [route, [...route].reverse()]) {
+        const scorer = new ProximityScorer(data, data.ids);
+        for (const iso of order) assert.equal(scorer.record(hashId(iso)).penalty, 0);
+        assert.equal(scorer.total, 0);
+    }
+});
+
+test('other intercontinental jumps still add a penalty', () => {
+    const scorer = new ProximityScorer(data, data.ids);
+    scorer.record(hashId('USA'));
+    const result = scorer.record(hashId('FRA'));
+    assert.equal(result.kind, 'distance');
+    assert.ok(result.penalty > 0);
+});
+
+test('crossing data preserves the actual map distance and is not a land border', () => {
+    const a = hashId('USA'), b = hashId('RUS');
+    const i = data.ids.indexOf(a), j = data.ids.indexOf(b);
+    assert.equal(data.crossingLinks.length, 1);
+    const link = data.crossingLinks[0];
+    assert.deepEqual([link.a, link.b], [a, b]);
+    assert.equal(link.label, 'Bering Strait');
+    assert.equal(link.distanceKm, data.distancesKm[i][j]);
+    assert.ok(link.distanceKm > 0);
+    assert.ok(!data.landNeighbors[i].includes(b));
+    assert.ok(!data.landNeighbors[j].includes(a));
+});
+
+test('invalid crossing endpoints are rejected', () => {
+    const invalid = structuredClone(data);
+    invalid.crossingLinks[0].a = 'unknown';
+    assert.throws(() => new ProximityScorer(invalid, data.ids), /Invalid crossing link/);
+});
+
 const polygon = coordinates => geometryShape({type: 'Polygon', coordinates: [coordinates]});
 test('spherical boundary distance handles borders, crossing edges and the date line', () => {
     const a = polygon([[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]);

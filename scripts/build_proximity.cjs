@@ -84,7 +84,7 @@ function build(world, config) {
     const index = new Map(ids.map((id, i) => [id, i]));
     const islands = new Set(config.islandCountries.map(hashId));
     const explicitBorders = new Set([...config.islandBorders, ...config.additionalMainlandBorders].map(([a, b]) => pairKey(hashId(a), hashId(b))));
-    for (const iso of [...config.islandCountries, ...config.islandBorders.flat(), ...config.additionalMainlandBorders.flat()]) {
+    for (const iso of [...config.islandCountries, ...config.islandBorders.flat(), ...config.additionalMainlandBorders.flat(), ...(config.crossingLinks || []).flatMap(link => link.countries)]) {
         if (!index.has(hashId(iso))) throw new Error(`Unknown country in configuration: ${iso}`);
     }
     const shapes = features.map(f => geometryShape(f.geometry));
@@ -110,7 +110,16 @@ function build(world, config) {
         if (closest === -1) throw new Error('No mainland candidate');
         islandLinks.push({island: ids[i], mainland: ids[closest], distanceKm: distancesKm[i][closest]});
     }
-    return {version: 1, ids, distancesKm, landNeighbors, islandLinks};
+    // Free gameplay crossings keep their real map distance and remain distinct
+    // from land borders and closest-mainland links.
+    const crossingLinks = (config.crossingLinks || []).map(({countries, label}) => {
+        if (countries.length !== 2 || countries[0] === countries[1] || typeof label !== 'string' || !label.trim()) {
+            throw new Error('Invalid crossing configuration');
+        }
+        const [a, b] = countries.map(hashId);
+        return {a, b, label, distanceKm: distancesKm[index.get(a)][index.get(b)]};
+    });
+    return {version: 1, ids, distancesKm, landNeighbors, islandLinks, crossingLinks};
 }
 
 if (require.main === module) {
