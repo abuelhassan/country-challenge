@@ -643,7 +643,13 @@
     const lookup = new Map();
 
     function norm(s) {
-        return s.toLowerCase().trim().replace(/['']/g, "'");
+        return s.normalize('NFKD')
+            .toLowerCase()
+            .replace(/\p{M}/gu, '')
+            .replace(/['‘’ʼ.]/g, '')
+            .replace(/\p{Dash_Punctuation}/gu, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     // ─── Spotlight state ─────────────────────────────────────────────────────────
@@ -898,6 +904,7 @@
         // Reset all highlighted countries
         pathMap.forEach(el => el.classList.remove('guessed', 'missed', 'latest'));
         inputEl.disabled = false;
+        inputEl.value = '';
         inputEl.focus();
     }
 
@@ -950,17 +957,17 @@
 
     function guess(raw) {
         const key = norm(raw);
-        if (!key) return;
+        if (!key) return false;
         const country = lookup.get(key);
         if (!country) {
             setFeedback('Not found', 'fb-err');
             inputEl.classList.add('wrong');
             setTimeout(() => inputEl.classList.remove('wrong'), 400);
-            return;
+            return false;
         }
         if (guessed.has(country.id)) {
             setFeedback('Already got it!', 'fb-dup');
-            return;
+            return false;
         }
         // Correct!
         if (!timerStarted) {
@@ -1000,14 +1007,14 @@
             launchConfetti();
             showSpotlight();
         }
+        return true;
     }
 
     // ─── Events ──────────────────────────────────────────────────────────────────
     inputEl.addEventListener('keydown', e => {
         if (e.key === 'Enter' && gameActive) {
             const val = inputEl.value;
-            guess(val);
-            inputEl.value = '';
+            if (guess(val)) inputEl.value = '';
             e.preventDefault();
         }
     });
